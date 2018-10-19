@@ -21,7 +21,7 @@ def __main__():
    parser.add_argument('--callability_levels_somatic', dest="callability_levels_somatic",default="0:30:200", help="Simple colon-separated string that defines four levels of variant callability: NO_COVERAGE (0), LOW_COVERAGE (0-29), CALLABLE (30-199), HIGH_COVERAGE (> 200). Initial value must be 0.")
    parser.add_argument('--target', dest = "target", help="BED file with target regions subject to sequencing")
    parser.add_argument('--force_overwrite', action = "store_true", help='By default, the script will fail with an error if any output file already exists. You can force the overwrite of existing result files by using this flag')
-   parser.add_argument('--no-docker', action='store_true', dest='no_docker', default=False, help='Run the cacao workflow in a non-Docker mode (see install_no_docker/ folder for instructions')
+   #parser.add_argument('--no-docker', action='store_true', dest='no_docker', default=False, help='Run the cacao workflow in a non-Docker mode (see install_no_docker/ folder for instructions')
    parser.add_argument('--version', action='version', version='%(prog)s ' + str(cacao_version))
    parser.add_argument('query_alignment_fname',help='Alignment file (BAM/CRAM)')
    parser.add_argument('track_directory', help='Directory with BED tracks of pathogenic/actionable cancer loci for grch37/grch38')

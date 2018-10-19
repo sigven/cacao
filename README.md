@@ -19,3 +19,64 @@ All three tracks (*hereditary*, *somatic_actionable*, and *somatic_hotspot*) are
    * variants and phenotypes (ClinVar),
    * clinical evidence items (therapeutic context, evidence level, from CIViC)
    * tumor types (cancerhotspots.org)
+
+An [example report](test.cacao.grch37.html) from the CACAO workflow showing callable cancer loci in an RNA sequence alignment.
+
+## Getting started
+
+### Installation
+
+* Clone the repository `git clone https://github.com/sigven/cacao.git`
+* Pull the docker image `docker pull sigven/cacao:1.0.0`
+
+### Usage
+
+Run the CACAO workflow with the `cacao_wflow.py` Python script, which takes the following parameters and options:
+
+usage: cacao_wflow.py [options] <BAM-or-CRAM> <TRACK_DIRECTORY> OUTPUT_DIR> <GENOME_ASSEMBLY> <MODE> <SAMPLE_ID>
+
+	cacao - assessment of sequencing coverage at pathogenic and actionable loci in
+	cancer
+
+	positional arguments:
+	  query_alignment_fname
+	                        Alignment file (BAM/CRAM)
+	  track_directory       Directory with BED tracks of pathogenic/actionable
+	                        cancer loci for grch37/grch38 (i.e. data/ from repo)
+	  output_directory      Output directory
+	  {grch37,grch38}       Human genome assembly build: grch37 or grch38
+	  {hereditary,somatic,any}
+	                        Choice of loci and clinical cancer context (cancer
+	                        predisposition/tumor sequencing)
+	  sample_id             Sample identifier - prefix for output files
+
+	optional arguments:
+	  -h, --help            show this help message and exit
+	  --mapq MAPQ           mapping quality threshold (default: 0)
+	  --threads THREADS     Number of mosdepth BAM decompression threads. (use 4
+	                        or fewer) (default: 0)
+	  --callability_levels_germline CALLABILITY_LEVELS_GERMLINE
+	                        Simple colon-separated string that defines four levels
+	                        of variant callability: NO_COVERAGE (0), LOW_COVERAGE
+	                        (0-9), CALLABLE (10-99), HIGH_COVERAGE ( > 100).
+	                        Initial value must be 0. (default: 0:10:100)
+	  --callability_levels_somatic CALLABILITY_LEVELS_SOMATIC
+	                        Simple colon-separated string that defines four levels
+	                        of variant callability: NO_COVERAGE (0), LOW_COVERAGE
+	                        (0-29), CALLABLE (30-199), HIGH_COVERAGE (> 200).
+	                        Initial value must be 0. (default: 0:30:200)
+	  --target TARGET       BED file with target regions subject to sequencing
+	                        (default: None)
+	  --force_overwrite     By default, the script will fail with an error if any
+	                        output file already exists. You can force the
+	                        overwrite of existing result files by using this flag
+	                        (default: False)
+	  --version             show program's version number and exit
+
+## Documentation
+
+COMING SOON
+
+## Contact
+
+sigven AT ifi.uio.no
