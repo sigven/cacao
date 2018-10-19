@@ -20,12 +20,16 @@ All three tracks (*hereditary*, *somatic_actionable*, and *somatic_hotspot*) are
    * clinical evidence items (therapeutic context, evidence level, from CIViC)
    * tumor types (cancerhotspots.org)
 
-An [example report](test.cacao.grch37.html) from the CACAO workflow showing callable cancer loci in an RNA sequence alignment.
+## Example report
+An [example report](https://folk.uio.no/sigven/test.cacao.grch37.html) from the CACAO workflow showing callable cancer loci in an RNA sequence alignment.
 
 ## Getting started
 
 ### Installation
 
+* Prerequisites:
+	* Make sure that [Docker](https://www.docker.com/) is installed and running
+	* The CACAO workflow script requires that Python3 is installed
 * Clone the repository `git clone https://github.com/sigven/cacao.git`
 * Pull the docker image `docker pull sigven/cacao:1.0.0`
 
