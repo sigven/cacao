@@ -1,0 +1,333 @@
+---
+title: "Callable cancer loci - `r cacao_report$sample_name`"
+date: '`r strftime(Sys.time(), format = "%B %d, %Y")`'
+output: 
+  html_document:
+    toc: true
+    theme: default
+    number_sections: false
+    toc_float: true
+    toc_depth: 3
+    fig_width: 5
+    fig_height: 4
+
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo = F,warning=FALSE, dpi=72, error=F, eval=T)
+
+eval_hereditary_loci <- F
+eval_somatic_actionable_loci <- F
+eval_somatic_hotspot_loci <- F
+eval_all_loci <- F
+mode <- ''
+if(cacao_report[['eval']][['hereditary']] == T){
+  eval_hereditary_loci <- T
+}
+if(cacao_report[['eval']][['somatic_actionable']] == T){
+  eval_somatic_actionable_loci <- T
+}
+if(cacao_report[['eval']][['somatic_hotspot']] == T){
+  eval_somatic_hotspot_loci <- T
+}
+if(cacao_report[['eval']][['hereditary']] == T && cacao_report[['eval']][['somatic_actionable']] == T){
+  eval_all_loci <- T
+}
+
+if(cacao_report[['mode']] == 'any'){
+  mode <- 'Hereditary cancer AND actionable somatic loci AND somatic hotspots'
+}
+if(cacao_report[['mode']] == 'germline'){
+  mode <- 'Hereditary cancer'
+}
+if(cacao_report[['mode']] == 'somatic'){
+  mode <- 'Actionable somatic loci AND somatic hotspots'
+}
+
+
+```
+
+
+The coverage report is generated with _[cacao](https://github.com/sigven/cacao)_ version `r cacao_report[['version']]`, using the following key settings:
+
+* Genome assembly: __`r cacao_report[['genome_assembly']]`__
+* Mode: __`r mode`__
+* Alignment quality threshold (MAPQ): __`r cacao_report[['mapq']]`__
+```{r levels_somatic, results="asis", echo = F, eval = eval_somatic_actionable_loci}
+cat("* Callability levels (<b>somatic</b>):\n")
+cat("<ul>\n")
+cat(paste0("<li><i>NO_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['no_coverage']],"</li>\n"))
+cat(paste0("<li><i>LOW_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['low']],"</li>\n"))
+cat(paste0("<li><i>CALLABLE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['callable']],"</li>\n"))
+cat(paste0("<li><i>HIGH_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['high']],"</li>\n"))
+cat("</ul>\n")
+
+```
+
+```{r levels_germline, results="asis", echo = F, eval = eval_hereditary_loci}
+cat("* Callability levels (<b>germline</b>):\n")
+cat("<ul>\n")
+cat(paste0("<li><i>NO_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['no_coverage']],"</li>\n"))
+cat(paste0("<li><i>LOW_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['low']],"</li>\n"))
+cat(paste0("<li><i>CALLABLE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['callable']],"</li>\n"))
+cat(paste0("<li><i>HIGH_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['high']],"</li>\n"))
+cat("</ul>\n")
+
+```
+
+
+## Hereditary cancer - known pathogenic loci
+
+### Global distribution
+
+```{r global_dist, echo = F, fig.width=12, fig.height=2, eval=eval_hereditary_loci}
+p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['hereditary']]) +
+  ggplot2::geom_bar(stat = 'identity') +
+  ggplot2::coord_flip() +
+  ggplot2::scale_fill_manual('CALLABILITY', values = c("#FC4E2A","#FD8D3C","#78C679","#41AB5D"),
+                    labels = c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE')) +
+  ggplot2::theme_classic() +
+  ggplot2::scale_y_continuous("Percent",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
+  ggplot2::theme(legend.title = ggplot2::element_blank(),
+                 axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
+                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -2),
+                 axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, angle = -90, hjust = 0.5),
+                 plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
+                 legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
+
+p
+#plotly::ggplotly(p)
+htmltools::br()
+```
+
+### Coverage per locus {.tabset}
+
+#### High coverage
+
+```{r high_coverage, echo=F, results = 'asis', eval = eval_hereditary_loci}
+library(summarywidget)
+library(crosstalk)
+
+loci_high_coverage <- crosstalk::SharedData$new(cacao_report[['loci']][['hereditary']][['high']])
+crosstalk::bscols(
+  list(
+    crosstalk::filter_select("SYMBOL", "Gene",loci_high_coverage, ~SYMBOL),
+    crosstalk::filter_select("NAME", "Locus name", loci_high_coverage, ~NAME)
+  ),
+  list(
+    crosstalk::filter_select("PHENOTYPE", "ClinVar phenotype(s)", loci_high_coverage, ~PHENOTYPE),
+    crosstalk::filter_select("LOCUSTYPE", "Type of locus", loci_high_coverage, ~LOCUSTYPE)
+
+  )
+)
+
+crosstalk::bscols(
+  DT::datatable(loci_high_coverage, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
+  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+)
+
+htmltools::br()
+
+```
+
+
+
+#### Callable
+
+```{r callable, echo=F, results = 'asis', eval = eval_hereditary_loci}
+library(summarywidget)
+library(crosstalk)
+
+loci_callable <- crosstalk::SharedData$new(cacao_report[['loci']][['hereditary']][['callable']])
+crosstalk::bscols(
+  list(
+    crosstalk::filter_select("SYMBOL", "Gene",loci_callable, ~SYMBOL),
+    crosstalk::filter_select("NAME", "Locus name", loci_callable, ~NAME)
+  ),
+  list(
+    crosstalk::filter_select("PHENOTYPE", "ClinVar phenotype(s)", loci_callable, ~PHENOTYPE),
+    crosstalk::filter_select("LOCUSTYPE", "Type of locus", loci_callable, ~LOCUSTYPE)
+
+  )
+)
+
+crosstalk::bscols(
+  DT::datatable(loci_callable, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
+  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+)
+
+htmltools::br()
+
+```
+
+
+#### Low coverage
+
+```{r low_coverage, echo=F, results = 'asis', eval = eval_hereditary_loci}
+library(summarywidget)
+library(crosstalk)
+
+loci_low_coverage <- crosstalk::SharedData$new(cacao_report[['loci']][['hereditary']][['low']])
+crosstalk::bscols(
+  list(
+    crosstalk::filter_select("SYMBOL", "Gene",loci_low_coverage, ~SYMBOL),
+    crosstalk::filter_select("NAME", "Locus name", loci_low_coverage, ~NAME)
+  ),
+  list(
+    crosstalk::filter_select("PHENOTYPE", "ClinVar phenotype(s)", loci_low_coverage, ~PHENOTYPE),
+    crosstalk::filter_select("LOCUSTYPE", "Type of locus", loci_low_coverage, ~LOCUSTYPE)
+
+  )
+)
+
+crosstalk::bscols(
+  DT::datatable(loci_low_coverage, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
+  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+)
+
+htmltools::br()
+
+```
+
+
+#### No coverage
+
+```{r no_coverage, echo=F, results = 'asis', eval = eval_hereditary_loci}
+library(summarywidget)
+library(crosstalk)
+
+loci_no_coverage <- crosstalk::SharedData$new(cacao_report[['loci']][['hereditary']][['no_coverage']])
+crosstalk::bscols(
+  list(
+    crosstalk::filter_select("SYMBOL", "Gene",loci_no_coverage, ~SYMBOL),
+    crosstalk::filter_select("NAME", "Locus name", loci_no_coverage, ~NAME)
+  ),
+  list(
+    crosstalk::filter_select("PHENOTYPE", "ClinVar phenotype(s)", loci_no_coverage, ~PHENOTYPE),
+    crosstalk::filter_select("LOCUSTYPE", "Type of locus", loci_no_coverage, ~LOCUSTYPE)
+
+  )
+)
+
+crosstalk::bscols(
+  DT::datatable(loci_no_coverage, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
+  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+)
+
+htmltools::br()
+
+```
+
+
+
+## Actionable loci - somatic mutations
+
+### Global distribution
+
+```{r global_dist_somatic_actionable, echo = F, fig.width=12, fig.height=2, eval=T}
+p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_actionable']]) +
+  ggplot2::geom_bar(stat = 'identity') +
+  ggplot2::coord_flip() +
+  ggplot2::scale_fill_manual('CALLABILITY', values = c("#FC4E2A","#FD8D3C","#78C679","#41AB5D"),
+                    labels = c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE')) +
+  ggplot2::theme_classic() +
+  ggplot2::scale_y_continuous("Percent",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
+  ggplot2::theme(legend.title = ggplot2::element_blank(),
+                 axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
+                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -2),
+                 axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, angle = -90, hjust = 0.5),
+                 plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
+                 legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
+
+p
+#plotly::ggplotly(p)
+htmltools::br()
+```
+
+### Coverage per locus
+
+
+```{r somatic_actionable_loci, echo=F, results = 'asis', eval = eval_somatic_actionable_loci}
+library(summarywidget)
+library(crosstalk)
+
+loci_sa <- crosstalk::SharedData$new(cacao_report[['loci']][['somatic_actionable']][['all']])
+crosstalk::bscols(
+  list(
+    crosstalk::filter_select("CALLABILITY", "Callability", loci_sa, ~CALLABILITY),
+    crosstalk::filter_select("SYMBOL", "Gene",loci_sa, ~SYMBOL),
+    crosstalk::filter_select("NAME", "Locus name", loci_sa, ~NAME)
+  ),
+  list(
+    crosstalk::filter_select("CANCERTYPE", "Cancer type",loci_sa, ~CANCERTYPE),
+    crosstalk::filter_select("EVIDENCE_TYPE", "Type of evidence", loci_sa, ~EVIDENCE_TYPE),
+    crosstalk::filter_select("EVIDENCE_LEVEL", "Level of evidence", loci_sa, ~EVIDENCE_LEVEL),
+    crosstalk::filter_select("THERAPEUTIC_CONTEXT", "Therapeutic context", loci_sa, ~THERAPEUTIC_CONTEXT)
+  )
+)
+
+crosstalk::bscols(
+  DT::datatable(loci_sa, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
+  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+)
+
+htmltools::br()
+
+```
+
+
+
+## Cancer hotspots
+
+### Global distribution
+
+```{r global_dist_somatic_hotspots, echo = F, fig.width=12, fig.height=2, eval=T}
+p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_hotspot']]) +
+  ggplot2::geom_bar(stat = 'identity') +
+  ggplot2::coord_flip() +
+  ggplot2::scale_fill_manual('CALLABILITY', values = c("#FC4E2A","#FD8D3C","#78C679","#41AB5D"),
+                    labels = c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE')) +
+  ggplot2::theme_classic() +
+  ggplot2::scale_y_continuous("Percent",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
+  ggplot2::theme(legend.title = ggplot2::element_blank(),
+                 axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
+                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -2),
+                 axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, angle = -90, hjust = 0.5),
+                 plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
+                 legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
+
+p
+#plotly::ggplotly(p)
+htmltools::br()
+```
+
+### Coverage per locus
+
+
+```{r somatic_hotspot_loci, echo=F, results = 'asis', eval = eval_somatic_hotspot_loci}
+library(summarywidget)
+library(crosstalk)
+
+loci_hotspot <- crosstalk::SharedData$new(cacao_report[['loci']][['somatic_hotspot']][['all']])
+crosstalk::bscols(
+  list(
+    crosstalk::filter_select("CALLABILITY", "Callability", loci_hotspot, ~CALLABILITY),
+    crosstalk::filter_select("SYMBOL", "Gene",loci_hotspot, ~SYMBOL),
+    crosstalk::filter_select("NAME", "Locus name", loci_hotspot, ~NAME)
+  ),
+  list(
+    crosstalk::filter_select("CANCERTYPE", "Cancer type",loci_hotspot, ~CANCERTYPE),
+    crosstalk::filter_slider("P-VALUE", "Hotspot p-value", loci_hotspot, ~P_VALUE)
+  )
+)
+
+crosstalk::bscols(
+  DT::datatable(loci_hotspot, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
+  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+)
+
+htmltools::br()
+
+```
+
+
