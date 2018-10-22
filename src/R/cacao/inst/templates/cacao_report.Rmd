@@ -75,12 +75,15 @@ cat("</ul>\n")
 
 ```
 
+```{r header_germline, results="asis", echo = F, eval = eval_hereditary_loci}
+cat("## Hereditary cancer - pathogenic loci\n")
 
-## Hereditary cancer - known pathogenic loci
-
-### Global distribution
+cat("### Global distribution\n")
+```
 
 ```{r global_dist, echo = F, fig.width=12, fig.height=2, eval=eval_hereditary_loci}
+
+
 p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['hereditary']]) +
   ggplot2::geom_bar(stat = 'identity') +
   ggplot2::coord_flip() +
@@ -100,11 +103,14 @@ p
 htmltools::br()
 ```
 
-### Coverage per locus {.tabset}
 
-#### High coverage
 
 ```{r high_coverage, echo=F, results = 'asis', eval = eval_hereditary_loci}
+
+cat("### Coverage per locus {.tabset}\n")
+
+cat("#### High coverage\n")
+
 library(summarywidget)
 library(crosstalk)
 
@@ -131,10 +137,10 @@ htmltools::br()
 ```
 
 
-
-#### Callable
-
 ```{r callable, echo=F, results = 'asis', eval = eval_hereditary_loci}
+
+cat("#### Callable\n")
+
 library(summarywidget)
 library(crosstalk)
 
@@ -161,11 +167,12 @@ htmltools::br()
 ```
 
 
-#### Low coverage
-
 ```{r low_coverage, echo=F, results = 'asis', eval = eval_hereditary_loci}
 library(summarywidget)
 library(crosstalk)
+
+cat("#### Low coverage\n")
+
 
 loci_low_coverage <- crosstalk::SharedData$new(cacao_report[['loci']][['hereditary']][['low']])
 crosstalk::bscols(
@@ -190,11 +197,12 @@ htmltools::br()
 ```
 
 
-#### No coverage
-
 ```{r no_coverage, echo=F, results = 'asis', eval = eval_hereditary_loci}
 library(summarywidget)
 library(crosstalk)
+
+cat("#### No coverage\n")
+
 
 loci_no_coverage <- crosstalk::SharedData$new(cacao_report[['loci']][['hereditary']][['no_coverage']])
 crosstalk::bscols(
@@ -220,11 +228,13 @@ htmltools::br()
 
 
 
-## Actionable loci - somatic mutations
+```{r header_actionable, results="asis", echo = F, eval = eval_somatic_actionable_loci}
+cat("## Sporadic cancers - actionable somatic mutations\n")
 
-### Global distribution
+cat("### Global distribution\n")
+```
 
-```{r global_dist_somatic_actionable, echo = F, fig.width=12, fig.height=2, eval=T}
+```{r global_dist_somatic_actionable, echo = F, fig.width=12, fig.height=2, eval=eval_somatic_actionable_loci}
 p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_actionable']]) +
   ggplot2::geom_bar(stat = 'identity') +
   ggplot2::coord_flip() +
@@ -244,30 +254,98 @@ p
 htmltools::br()
 ```
 
-### Coverage per locus
 
-
-```{r somatic_actionable_loci, echo=F, results = 'asis', eval = eval_somatic_actionable_loci}
+```{r somatic_actionable_loci_predictive, echo=F, results = 'asis', eval = eval_somatic_actionable_loci}
 library(summarywidget)
 library(crosstalk)
 
-loci_sa <- crosstalk::SharedData$new(cacao_report[['loci']][['somatic_actionable']][['all']])
+cat("### Coverage per locus {.tabset}\n")
+
+cat("#### Predictive\n")
+
+
+loci_predictive <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Predictive")
+loci_pred <- crosstalk::SharedData$new(loci_predictive)
 crosstalk::bscols(
   list(
-    crosstalk::filter_select("CALLABILITY", "Callability", loci_sa, ~CALLABILITY),
-    crosstalk::filter_select("SYMBOL", "Gene",loci_sa, ~SYMBOL),
-    crosstalk::filter_select("NAME", "Locus name", loci_sa, ~NAME)
+    crosstalk::filter_select("CALLABILITY", "Callability", loci_pred, ~CALLABILITY),
+    crosstalk::filter_select("SYMBOL", "Gene",loci_pred, ~SYMBOL),
+    crosstalk::filter_select("NAME", "Locus name", loci_pred, ~NAME)
   ),
   list(
-    crosstalk::filter_select("CANCERTYPE", "Cancer type",loci_sa, ~CANCERTYPE),
-    crosstalk::filter_select("EVIDENCE_TYPE", "Type of evidence", loci_sa, ~EVIDENCE_TYPE),
-    crosstalk::filter_select("EVIDENCE_LEVEL", "Level of evidence", loci_sa, ~EVIDENCE_LEVEL),
-    crosstalk::filter_select("THERAPEUTIC_CONTEXT", "Therapeutic context", loci_sa, ~THERAPEUTIC_CONTEXT)
+    crosstalk::filter_select("CANCERTYPE", "Cancer type",loci_pred, ~CANCERTYPE),
+    crosstalk::filter_select("CLINICAL_SIGNIFICANCE", "Clinical significance", loci_pred, ~CLINICAL_SIGNIFICANCE),
+    crosstalk::filter_select("EVIDENCE_LEVEL", "Level of evidence", loci_pred, ~EVIDENCE_LEVEL),
+    crosstalk::filter_select("THERAPEUTIC_CONTEXT", "Therapeutic context", loci_pred, ~THERAPEUTIC_CONTEXT)
   )
 )
 
 crosstalk::bscols(
-  DT::datatable(loci_sa, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
+  DT::datatable(loci_pred, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
+  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+)
+
+htmltools::br()
+
+```
+
+
+```{r somatic_actionable_loci_diagnostic, echo=F, results = 'asis', eval = eval_somatic_actionable_loci}
+library(summarywidget)
+library(crosstalk)
+
+cat("#### Diagnostic\n")
+
+
+loci_diagnostic <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Diagnostic")
+loci_dia <- crosstalk::SharedData$new(loci_diagnostic)
+crosstalk::bscols(
+  list(
+    crosstalk::filter_select("CALLABILITY", "Callability", loci_dia, ~CALLABILITY),
+    crosstalk::filter_select("SYMBOL", "Gene",loci_dia, ~SYMBOL),
+    crosstalk::filter_select("NAME", "Locus name", loci_dia, ~NAME)
+  ),
+  list(
+    crosstalk::filter_select("CANCERTYPE", "Cancer type",loci_dia, ~CANCERTYPE),
+    crosstalk::filter_select("CLINICAL_SIGNIFICANCE", "Clinical significance", loci_dia, ~CLINICAL_SIGNIFICANCE),
+    crosstalk::filter_select("EVIDENCE_LEVEL", "Level of evidence", loci_dia, ~EVIDENCE_LEVEL)
+  )
+)
+
+crosstalk::bscols(
+  DT::datatable(loci_dia, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
+  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+)
+
+htmltools::br()
+
+```
+
+
+```{r somatic_actionable_loci_prognostic, echo=F, results = 'asis', eval = eval_somatic_actionable_loci}
+library(summarywidget)
+library(crosstalk)
+
+cat("#### Prognostic\n")
+
+
+loci_predictive <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Prognostic")
+loci_prog <- crosstalk::SharedData$new(loci_predictive)
+crosstalk::bscols(
+  list(
+    crosstalk::filter_select("CALLABILITY", "Callability", loci_prog, ~CALLABILITY),
+    crosstalk::filter_select("SYMBOL", "Gene",loci_prog, ~SYMBOL),
+    crosstalk::filter_select("NAME", "Locus name", loci_prog, ~NAME)
+  ),
+  list(
+    crosstalk::filter_select("CANCERTYPE", "Cancer type",loci_prog, ~CANCERTYPE),
+    crosstalk::filter_select("CLINICAL_SIGNIFICANCE", "Clinical significance", loci_prog, ~CLINICAL_SIGNIFICANCE),
+    crosstalk::filter_select("EVIDENCE_LEVEL", "Level of evidence", loci_prog, ~EVIDENCE_LEVEL)
+  )
+)
+
+crosstalk::bscols(
+  DT::datatable(loci_prog, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
   DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
 )
 
@@ -277,11 +355,15 @@ htmltools::br()
 
 
 
-## Cancer hotspots
 
-### Global distribution
+```{r header_hotspot, results="asis", echo = F, eval = eval_somatic_hotspot_loci}
+cat("## Somatic cancer hotspots\n")
 
-```{r global_dist_somatic_hotspots, echo = F, fig.width=12, fig.height=2, eval=T}
+cat("### Global distribution\n")
+```
+
+
+```{r global_dist_somatic_hotspots, echo = F, fig.width=12, fig.height=2, eval=eval_somatic_hotspot_loci}
 p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_hotspot']]) +
   ggplot2::geom_bar(stat = 'identity') +
   ggplot2::coord_flip() +
@@ -301,12 +383,14 @@ p
 htmltools::br()
 ```
 
-### Coverage per locus
+
 
 
 ```{r somatic_hotspot_loci, echo=F, results = 'asis', eval = eval_somatic_hotspot_loci}
 library(summarywidget)
 library(crosstalk)
+
+cat("### Coverage per locus\n")
 
 loci_hotspot <- crosstalk::SharedData$new(cacao_report[['loci']][['somatic_hotspot']][['all']])
 crosstalk::bscols(

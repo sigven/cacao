@@ -61,7 +61,7 @@ for(c in c('hereditary','somatic_actionable','somatic_hotspot')){
     }
     if(c == 'somatic_actionable'){
       coverage_pr_loci[[c]] <- cacao::assign_callability(coverage_pr_loci[[c]], coverage_levels_somatic)
-      coverage_pr_loci[[c]] <- coverage_pr_loci[[c]] %>% dplyr::select(SYMBOL, NAME, CALLABILITY, COVERAGE, CANCERTYPE, AMINO_ACID_POSITION, dplyr::everything())
+      coverage_pr_loci[[c]] <- coverage_pr_loci[[c]] %>% dplyr::select(NAME, CALLABILITY, CANCERTYPE, CLINICAL_SIGNIFICANCE, EVIDENCE_LEVEL, dplyr::everything())
       cacao_report[['loci']][[c]][['all']] <- coverage_pr_loci[[c]]
       cacao_report[['loci']][[c]][['no_coverage']] <- dplyr::filter(coverage_pr_loci[[c]], CALLABILITY == "NO_COVERAGE")
       cacao_report[['loci']][[c]][['low']] <- dplyr::filter(coverage_pr_loci[[c]], CALLABILITY == "LOW_COVERAGE")

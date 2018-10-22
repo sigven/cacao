@@ -123,22 +123,35 @@ append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = 
 
   if(mode == "somatic_actionable" && !is.null(coverage_df) && !is.null(annotation_df)){
     annotation_df_status <- 'OK'
-    for(var in c('name','symbol','ensembl_transcript_id','hgvsc', 'codon',
-                 'evidence_type','evidence_level','therapeutic_context','cancer_type','genomic_change')){
+    for(var in c('name','symbol','ensembl_transcript_id','hgvsc', 'codon','pubmed_html_link', 'evidence_id','disease_ontology_id',
+                 'evidence_type','evidence_level','therapeutic_context','clinical_significance','cancer_type','genomic_change')){
       if(!(var %in% colnames(annotation_df))){
         annotation_df_status <- 'MISSING_DATA'
       }
     }
     if(annotation_df_status == 'OK'){
-      coverage_df <- coverage_df %>%
-        dplyr::left_join(dplyr::select(annotation_df, name, symbol, ensembl_transcript_id,
-                                       hgvsc, codon, evidence_level, evidence_type, cancer_type, therapeutic_context, genomic_change),by=c("name")) %>%
+      coverage_df <- as.data.frame(coverage_df %>%
+        dplyr::left_join(dplyr::select(annotation_df, name, symbol, ensembl_transcript_id,pubmed_html_link,disease_ontology_id,clinical_significance,
+                                       hgvsc, codon, evidence_level, evidence_id, evidence_type, cancer_type, therapeutic_context, genomic_change),by=c("name")) %>%
         dplyr::rename(EVIDENCE_LEVEL = evidence_level, EVIDENCE_TYPE = evidence_type, THERAPEUTIC_CONTEXT = therapeutic_context, SYMBOL = symbol,
-                      COVERAGE = coverage, HGVSc = hgvsc, AMINO_ACID_POSITION = codon, NAME = name,
-                      CANCERTYPE = cancer_type, ENSEMBL_TRANSCRIPT_ID = ensembl_transcript_id, GENOMIC_CHANGE = genomic_change) %>%
+                      COVERAGE = coverage, HGVSc = hgvsc, AMINO_ACID_POSITION = codon, NAME = name, CLINICAL_SIGNIFICANCE = clinical_significance,
+                      CANCERTYPE = cancer_type, ENSEMBL_TRANSCRIPT_ID = ensembl_transcript_id, CITATION = pubmed_html_link, GENOMIC_CHANGE = genomic_change,
+                      EVIDENCE_ID = evidence_id) %>%
         dplyr::mutate(REGION = paste(paste(chrom,start,sep=":"),end,sep="-"), COVERAGE = floor(COVERAGE)) %>%
         dplyr::select(-c(chrom,start,end)) %>%
-        dplyr::filter(!is.na(COVERAGE))
+        dplyr::filter(!is.na(COVERAGE)) %>%
+        dplyr::mutate(NAME = stringr::str_replace(NAME,"^EID[0-9]{1,}:","")) %>%
+        dplyr::group_by(NAME, SYMBOL, REGION, ENSEMBL_TRANSCRIPT_ID, AMINO_ACID_POSITION, COVERAGE, EVIDENCE_TYPE, EVIDENCE_LEVEL, CANCERTYPE) %>%
+        dplyr::summarise(THERAPEUTIC_CONTEXT = paste(unique(THERAPEUTIC_CONTEXT), collapse=", "),
+                         CLINICAL_SIGNIFICANCE = paste(unique(CLINICAL_SIGNIFICANCE),collapse=", "),
+                         GENOMIC_CHANGE = paste(unique(GENOMIC_CHANGE),collapse=", "),
+                         CITATION = paste(unique(CITATION), collapse=", ")))
+
+
+        therapeutic_contexts <- dplyr::select(coverage_df, NAME, REGION, GENOMIC_CHANGE, CANCERTYPE, THERAPEUTIC_CONTEXT) %>%
+          tidyr::separate_rows(THERAPEUTIC_CONTEXT,sep=", ") %>%
+          dplyr::distinct()
+
     }
   }
 

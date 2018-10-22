@@ -58,9 +58,23 @@ def __main__():
        else:
            coverage_bed_tracks[m] = "NA"
     
-   report_R_command = "/cacao.R " + " ".join(str(coverage_bed_tracks['hereditary']),str(coverage_tsv_tracks['hereditary']), str(coverage_bed_tracks['somatic_actionable']),str(coverage_tsv_tracks['somatic_actionable']),
-   str(coverage_bed_tracks['somatic_hotspot']),str(coverage_tsv_tracks['somatic_hotspot']), str(args.sample_id), str(args.mode), str(args.callability_levels_germline),str(args.callability_levels_somatic),str(args.mapq),
-   str(args.genome_assembly),str(cacao_version),str(args.output_directory))
+   cacao_report_parameters = []
+   cacao_report_parameters.append(coverage_bed_tracks['hereditary'])
+   cacao_report_parameters.append(coverage_tsv_tracks['hereditary'])
+   cacao_report_parameters.append(coverage_bed_tracks['somatic_actionable'])
+   cacao_report_parameters.append(coverage_tsv_tracks['somatic_actionable'])
+   cacao_report_parameters.append(coverage_bed_tracks['somatic_hotspot'])
+   cacao_report_parameters.append(coverage_tsv_tracks['somatic_hotspot'])
+   cacao_report_parameters.append(str(args.sample_id))
+   cacao_report_parameters.append(str(args.mode))
+   cacao_report_parameters.append(str(args.callability_levels_germline))
+   cacao_report_parameters.append(str(args.callability_levels_somatic))
+   cacao_report_parameters.append(str(args.mapq))
+   cacao_report_parameters.append(str(args.genome_assembly))
+   cacao_report_parameters.append(str(cacao_version))
+   cacao_report_parameters.append(str(args.output_directory))
+
+   report_R_command = "/cacao.R " + " ".join(cacao_report_parameters)
    check_subprocess(report_R_command)
 
    logger.info('Finished')
