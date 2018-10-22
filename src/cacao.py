@@ -22,7 +22,7 @@ def __main__():
    parser.add_argument('sample_id', help="Sample identifier - prefix for output files")
    parser.add_argument('mapq', default = 0, type=int, help="mapping quality threshold")
    parser.add_argument('threads',default = 0, type=int, help='Number of mosdepth BAM decompression threads. (use 4 or fewer)')
-   parser.add_argument('callability_levels_germline', default="0:10:150", help="Intervals of sequencing depth denoting e.g. NO_COVERAGE (0), LOW_COVERAGE (1-9), CALLABLE (10-149), HIGH_COVERAGE (>= 150)")
+   parser.add_argument('callability_levels_germline', default="0:10:100", help="Intervals of sequencing depth denoting e.g. NO_COVERAGE (0), LOW_COVERAGE (1-9), CALLABLE (10-99), HIGH_COVERAGE (>= 100)")
    parser.add_argument('callability_levels_somatic', default="0:30:200", help="Intervals of sequencing depth denoting e.g. NO_COVERAGE (0), LOW_COVERAGE (1-29), CALLABLE (30-199), HIGH_COVERAGE (>= 200)")
 
 
@@ -58,8 +58,9 @@ def __main__():
        else:
            coverage_bed_tracks[m] = "NA"
     
-   #print(str(coverage_bed_tracks)) 
-   report_R_command = '/cacao.R ' + str(coverage_bed_tracks['hereditary']) + ' ' + str(coverage_tsv_tracks['hereditary']) + ' ' + str(coverage_bed_tracks['somatic_actionable']) + ' ' + str(coverage_tsv_tracks['somatic_actionable']) + ' ' + str(coverage_bed_tracks['somatic_hotspot']) + ' ' + str(coverage_tsv_tracks['somatic_hotspot']) + ' ' + str(args.sample_id) + ' ' + str(args.mode) + ' ' + str(args.callability_levels_germline) + ' ' + str(args.callability_levels_somatic) + ' ' + str(args.mapq) + ' ' + str(args.genome_assembly) + ' ' + str(cacao_version) + ' ' + str(args.output_directory)
+   report_R_command = "/cacao.R " + " ".join(str(coverage_bed_tracks['hereditary']),str(coverage_tsv_tracks['hereditary']), str(coverage_bed_tracks['somatic_actionable']),str(coverage_tsv_tracks['somatic_actionable']),
+   str(coverage_bed_tracks['somatic_hotspot']),str(coverage_tsv_tracks['somatic_hotspot']), str(args.sample_id), str(args.mode), str(args.callability_levels_germline),str(args.callability_levels_somatic),str(args.mapq),
+   str(args.genome_assembly),str(cacao_version),str(args.output_directory))
    check_subprocess(report_R_command)
 
    logger.info('Finished')

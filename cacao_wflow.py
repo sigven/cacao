@@ -14,11 +14,11 @@ cacao_version = '1.0.0'
 
 def __main__():
    
-   parser = argparse.ArgumentParser(description='cacao - assessment of sequencing coverage at pathogenic and actionable loci in cancer',formatter_class=argparse.ArgumentDefaultsHelpFormatter, usage="%(prog)s [options] <BAM-or-CRAM> <TRACK_DIRECTORY> OUTPUT_DIR> <GENOME_ASSEMBLY> <MODE> <SAMPLE_ID>")
+   parser = argparse.ArgumentParser(description='cacao - assessment of sequencing coverage at pathogenic and actionable loci in cancer',formatter_class=argparse.ArgumentDefaultsHelpFormatter, usage="%(prog)s [options] <BAM-or-CRAM> <TRACK_DIRECTORY> <OUTPUT_DIR> <GENOME_ASSEMBLY> <CANCER_MODE> <SAMPLE_ID>")
    parser.add_argument('--mapq', dest = "mapq", default = 0, type=int, help='mapping quality threshold')
    parser.add_argument('--threads', dest = "threads", default = 0, type=int, help='Number of mosdepth BAM decompression threads. (use 4 or fewer)')
-   parser.add_argument('--callability_levels_germline', dest="callability_levels_germline",default="0:10:100", help="Simple colon-separated string that defines four levels of variant callability: NO_COVERAGE (0), LOW_COVERAGE (0-9), CALLABLE (10-99), HIGH_COVERAGE ( > 100). Initial value must be 0.")
-   parser.add_argument('--callability_levels_somatic', dest="callability_levels_somatic",default="0:30:200", help="Simple colon-separated string that defines four levels of variant callability: NO_COVERAGE (0), LOW_COVERAGE (0-29), CALLABLE (30-199), HIGH_COVERAGE (> 200). Initial value must be 0.")
+   parser.add_argument('--callability_levels_germline', dest="callability_levels_germline",default="0:10:100", help="Simple colon-separated string that defines four levels of variant callability: NO_COVERAGE (0), LOW_COVERAGE (1-9), CALLABLE (10-99), HIGH_COVERAGE ( >= 100). Initial value must be 0.")
+   parser.add_argument('--callability_levels_somatic', dest="callability_levels_somatic",default="0:30:200", help="Simple colon-separated string that defines four levels of variant callability: NO_COVERAGE (0), LOW_COVERAGE (1-29), CALLABLE (30-199), HIGH_COVERAGE (>= 200). Initial value must be 0.")
    parser.add_argument('--target', dest = "target", help="BED file with target regions subject to sequencing")
    parser.add_argument('--force_overwrite', action = "store_true", help='By default, the script will fail with an error if any output file already exists. You can force the overwrite of existing result files by using this flag')
    #parser.add_argument('--no-docker', action='store_true', dest='no_docker', default=False, help='Run the cacao workflow in a non-Docker mode (see install_no_docker/ folder for instructions')

@@ -37,7 +37,7 @@ An [example report](https://folk.uio.no/sigven/test.cacao.grch37.html) from the 
 
 Run the CACAO workflow with the `cacao_wflow.py` Python script, which takes the following parameters and options:
 
-usage: cacao_wflow.py [options] <BAM-or-CRAM> <TRACK_DIRECTORY> OUTPUT_DIR> <GENOME_ASSEMBLY> <MODE> <SAMPLE_ID>
+cacao_wflow.py [options] <BAM-or-CRAM> <TRACK_DIRECTORY> <OUTPUT_DIR> <GENOME_ASSEMBLY> <CANCER_MODE> <SAMPLE_ID>
 
 	cacao - assessment of sequencing coverage at pathogenic and actionable loci in
 	cancer
