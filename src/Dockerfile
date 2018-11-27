@@ -73,7 +73,7 @@ RUN conda install mosdepth
 RUN rm -rf /Miniconda3-latest-Linux-x86_64.sh
 
 ## Install pandoc (for HTML report generation)
-RUN wget https://github.com/jgm/pandoc/releases/download/2.3.1/pandoc-2.3.1-1-amd64.deb && \
+RUN wget https://github.com/jgm/pandoc/releases/download/2.4/pandoc-2.4-1-amd64.deb && \
   dpkg -i pandoc* && \
   rm pandoc* && \
   apt-get clean

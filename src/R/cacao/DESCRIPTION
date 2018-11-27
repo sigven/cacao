@@ -1,10 +1,10 @@
 Package: cacao
 Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
+Title: Callable Cancer Loci
+Version: 1.0.0
+Author: Sigve Nakken
+Maintainer: Sigve Nakken <sigven@ifi.uio.no>
+Description: Sequence coverage report for actionable and pathogenic loci in cancer
     Use four spaces when indenting paragraphs within the Description.
 License: What license is it under?
 Encoding: UTF-8

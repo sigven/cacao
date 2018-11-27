@@ -1,4 +1,8 @@
 exportPattern("^[[:alpha:]]+")
 
 export(assign_callability)
+export(read_raw_coverage)
 export(init_report)
+export(append_annotations)
+export(global_coverage_distribution)
+export(coverage_distribution_pr_gene)

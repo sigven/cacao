@@ -16,32 +16,94 @@ output:
 ```{r global_options, include=FALSE}
 knitr::opts_chunk$set(echo = F,warning=FALSE, dpi=72, error=F, eval=T)
 
-eval_hereditary_loci <- F
-eval_somatic_actionable_loci <- F
-eval_somatic_hotspot_loci <- F
-eval_all_loci <- F
+color_callability_map <- c("NON_TARGET" = "#E0DFDF", "NO_COVERAGE" = "#FC4E2A", "LOW_COVERAGE" = "#FD8D3C", "CALLABLE" = "#78C679", "HIGH_COVERAGE" = "#207733")
+color_callability <- c("#E0DFDF","#FC4E2A","#FD8D3C","#78C679","#207733")
+
+eval_section <- list()
+eval_global_plot <- list()
+for(c in c('hereditary_loci','somatic_actionable','somatic_hotspot','all')){
+  eval_section[[c]] <- F
+  eval_global_plot[[c]] <- list()
+}
+
+eval_tab <- list()
+missing_tab <- list()
+for(d in c('somatic_actionable','somatic_hotspot','hereditary_loci')){
+  eval_tab[[d]] <- list()
+  missing_tab[[d]] <- list()
+  if(d == 'hereditary_loci'){
+    for(level in c('high','callable','low','no_coverage')){
+      eval_tab[[d]][[level]] <- F
+      missing_tab[[d]][[level]] <- T
+    }
+  }
+  if(d == 'somatic_actionable'){
+    for(level in c('diagnostic','prognostic','predictive')){
+      eval_tab[[d]][[level]] <- F
+      missing_tab[[d]][[level]] <- F
+    }
+  }
+}
+
 mode <- ''
 if(cacao_report[['eval']][['hereditary']] == T){
-  eval_hereditary_loci <- T
+  eval_section[['hereditary_loci']] <- T
+  for(clevel in c('high','callable','low','no_coverage')){
+    if(nrow(cacao_report[['loci']][['hereditary']][[clevel]]) > 0){
+      eval_tab[['hereditary_loci']][[clevel]] <- T
+      missing_tab[['hereditary_loci']][[clevel]] <- F
+    }
+  }
 }
 if(cacao_report[['eval']][['somatic_actionable']] == T){
-  eval_somatic_actionable_loci <- T
+  eval_section[['somatic_actionable']] <- T
+  actionable_loci <- list()
+  actionable_loci[['predictive']] <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Predictive")
+  actionable_loci[['diagnostic']] <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Diagnostic")
+  actionable_loci[['prognostic']] <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Prognostic")
+  for(evtype in c('predictive','diagnostic','prognostic')){
+    if(nrow(actionable_loci[[evtype]]) > 0){
+      eval_tab[['somatic_actionable']][[evtype]] <- T
+      missing_tab[['somatic_actionable']][[evtype]] <- F
+    }else{
+      missing_tab[['somatic_actionable']][[evtype]] <- T
+    }
+  }
+  
 }
 if(cacao_report[['eval']][['somatic_hotspot']] == T){
-  eval_somatic_hotspot_loci <- T
+  eval_section[['somatic_hotspot']] <- T
 }
 if(cacao_report[['eval']][['hereditary']] == T && cacao_report[['eval']][['somatic_actionable']] == T){
-  eval_all_loci <- T
+  eval_section[['all']] <- T
 }
 
 if(cacao_report[['mode']] == 'any'){
   mode <- 'Hereditary cancer AND actionable somatic loci AND somatic hotspots'
 }
-if(cacao_report[['mode']] == 'germline'){
+if(cacao_report[['mode']] == 'hereditary'){
   mode <- 'Hereditary cancer'
 }
 if(cacao_report[['mode']] == 'somatic'){
   mode <- 'Actionable somatic loci AND somatic hotspots'
+}
+
+fig_height_gene_distribution <- ceiling(length(unique(cacao_report[['gene_distribution']][['hereditary']]$SYMBOL)) / 7.2) + 3
+
+subchunkify <- function(g, fig_height=25, fig_width=12) {
+  g_deparsed <- paste0(deparse(
+    function() {g}
+  ), collapse = '')
+  
+  sub_chunk <- paste0("
+  `","``{r sub_chunk_", floor(runif(1) * 10000), ", fig.height=", fig_height, ", fig.width=", fig_width, ", echo=FALSE}",
+  "\n(", 
+    g_deparsed
+    , ")()",
+  "\n`","``
+  ")
+  
+  cat(knitr::knit(text = knitr::knit_expand(text = sub_chunk), quiet = TRUE))
 }
 
 
@@ -52,8 +114,15 @@ The coverage report is generated with _[cacao](https://github.com/sigven/cacao)_
 
 * Genome assembly: __`r cacao_report[['genome_assembly']]`__
 * Mode: __`r mode`__
+* Data sources - cancer loci:
+    * [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) - release 20181101
+    * [CIViC](http://civic.genome.wustl.edu) - Nov 18th 2018
+    * [cancerhotspots.org](http://cancerhotspots.org) - version 2 (2017)
 * Alignment quality threshold (MAPQ): __`r cacao_report[['mapq']]`__
-```{r levels_somatic, results="asis", echo = F, eval = eval_somatic_actionable_loci}
+* Alignment filename: __`r cacao_report[['host_alignment_fname']]`__
+* Target regions filename: __`r cacao_report[['host_target_fname']]`__
+
+```{r levels_somatic, results="asis", echo = F, eval = eval_section[['somatic_actionable']]}
 cat("* Callability levels (<b>somatic</b>):\n")
 cat("<ul>\n")
 cat(paste0("<li><i>NO_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['no_coverage']],"</li>\n"))
@@ -64,7 +133,7 @@ cat("</ul>\n")
 
 ```
 
-```{r levels_germline, results="asis", echo = F, eval = eval_hereditary_loci}
+```{r levels_germline, results="asis", echo = F, eval = eval_section[['hereditary_loci']]}
 cat("* Callability levels (<b>germline</b>):\n")
 cat("<ul>\n")
 cat(paste0("<li><i>NO_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['no_coverage']],"</li>\n"))
@@ -75,39 +144,76 @@ cat("</ul>\n")
 
 ```
 
-```{r header_germline, results="asis", echo = F, eval = eval_hereditary_loci}
+```{r header_germline, results="asis", echo = F, eval = eval_section[['hereditary_loci']]}
 cat("## Hereditary cancer - pathogenic loci\n")
 
 cat("### Global distribution\n")
 ```
 
-```{r global_dist, echo = F, fig.width=12, fig.height=2, eval=eval_hereditary_loci}
+```{r global_dist, echo = F, fig.width=12, fig.height=2, eval=eval_section[['hereditary_loci']]}
 
+tot_loci <- sum(cacao_report[['global_distribution']][['hereditary']]$n)
 
 p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['hereditary']]) +
-  ggplot2::geom_bar(stat = 'identity') +
+  ggplot2::geom_bar(stat = 'identity', position = ggplot2::position_stack()) +
   ggplot2::coord_flip() +
-  ggplot2::scale_fill_manual('CALLABILITY', values = c("#FC4E2A","#FD8D3C","#78C679","#41AB5D"),
-                    labels = c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE')) +
   ggplot2::theme_classic() +
-  ggplot2::scale_y_continuous("Percent",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
+  ggplot2::geom_text(ggplot2::aes(y = 106), label = paste0("N = ",tot_loci), size = 4) +
+  ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
   ggplot2::theme(legend.title = ggplot2::element_blank(),
                  axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
-                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -2),
+                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
+                 axis.title.y = ggplot2::element_blank(),
                  axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, angle = -90, hjust = 0.5),
                  plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
                  legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
 
+p <- p + ggplot2::scale_fill_manual(values = color_callability_map)
 p
 #plotly::ggplotly(p)
 htmltools::br()
+htmltools::br()
+
+```
+
+
+```{r gene_dist, echo = F, fig.width=12, fig.height=fig_height_gene_distribution, eval=eval_section[['hereditary_loci']]}
+
+cat("### Gene distribution\n")
+
+p1 <- ggplot2::ggplot(cacao_report[['gene_distribution']][['hereditary']],ggplot2::aes(x=SYMBOL, y=frac, fill=CALLABILITY)) +
+  ggplot2::geom_bar(position = ggplot2::position_stack(), stat="identity") +
+  ggplot2::geom_text(ggplot2::aes(x = SYMBOL, y = tot_frac + 5, label = paste0("N = ",tot_loci)), size = 4) +
+  ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
+  ggplot2::coord_flip() +
+  ggplot2::theme_classic() +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
+                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
+                 axis.title.y = ggplot2::element_blank(),
+                 legend.title = ggplot2::element_blank(),
+                 axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, hjust = 0.5),
+                 plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
+                 legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
+p1 <- p1 + ggplot2::scale_fill_manual(values = color_callability_map)
+
+#p1 <- plotly::ggplotly(p1)
+p1
+htmltools::br()
+htmltools::br()
+
 ```
 
 
 
-```{r high_coverage, echo=F, results = 'asis', eval = eval_hereditary_loci}
 
-cat("### Coverage per locus {.tabset}\n")
+
+```{r cov_header_germline, results="asis", echo = F, eval = eval_section[['hereditary_loci']]}
+cat("### Coverage per variant locus {.tabset}\n")
+```
+
+
+```{r high_coverage, echo=F, results = 'asis', eval = eval_tab[['hereditary_loci']][['high']]}
+
 
 cat("#### High coverage\n")
 
@@ -129,15 +235,24 @@ crosstalk::bscols(
 
 crosstalk::bscols(
   DT::datatable(loci_high_coverage, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
-  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+  DT::formatStyle('CALLABILITY', color='white', backgroundColor = DT::styleEqual(c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), color_callability))
 )
 
 htmltools::br()
 
 ```
 
+```{r hereditary_high_cov_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary_loci']][['high']]}
+cat("#### High coverage\n")
 
-```{r callable, echo=F, results = 'asis', eval = eval_hereditary_loci}
+cat('<i>No loci with <b>high sequencing coverage</b> found.</i>',sep='\n')
+cat('\n')
+cat('\n')
+```
+<br><br>
+
+
+```{r hereditary_callable, echo=F, results = 'asis', eval = eval_tab[['hereditary_loci']][['callable']]}
 
 cat("#### Callable\n")
 
@@ -159,15 +274,22 @@ crosstalk::bscols(
 
 crosstalk::bscols(
   DT::datatable(loci_callable, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
-  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+  DT::formatStyle('CALLABILITY', color='white', backgroundColor = DT::styleEqual(c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), color_callability))
 )
 
 htmltools::br()
 
 ```
 
+```{r hereditary_callable_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary_loci']][['callable']]}
+cat("#### Callable\n")
 
-```{r low_coverage, echo=F, results = 'asis', eval = eval_hereditary_loci}
+cat('<i>No <b>callable</b> loci found.</i>',sep='\n')
+cat('\n')
+cat('\n')
+```
+
+```{r hereditary_low_coverage, echo=F, results = 'asis', eval = eval_tab[['hereditary_loci']][['low']]}
 library(summarywidget)
 library(crosstalk)
 
@@ -189,15 +311,24 @@ crosstalk::bscols(
 
 crosstalk::bscols(
   DT::datatable(loci_low_coverage, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
-  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+  DT::formatStyle('CALLABILITY', color='white', backgroundColor = DT::styleEqual(c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), color_callability))
 )
 
 htmltools::br()
 
 ```
 
+```{r hereditary_low_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary_loci']][['low']]}
+cat("#### Low coverage\n")
 
-```{r no_coverage, echo=F, results = 'asis', eval = eval_hereditary_loci}
+cat('<i>No loci with <b>low coverage</b> loci.</i>',sep='\n')
+cat('\n')
+cat('\n')
+```
+
+
+
+```{r hereditary_no_coverage, echo=F, results = 'asis', eval = eval_tab[['hereditary_loci']][['no_coverage']]}
 library(summarywidget)
 library(crosstalk)
 
@@ -219,52 +350,69 @@ crosstalk::bscols(
 
 crosstalk::bscols(
   DT::datatable(loci_no_coverage, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
-  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+  DT::formatStyle('CALLABILITY', color='white', backgroundColor = DT::styleEqual(c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), color_callability))
 )
 
 htmltools::br()
 
 ```
 
+```{r hereditary_nocov_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary_loci']][['no_coverage']]}
+cat("#### No coverage\n")
+
+cat('<i>No loci with <b>zero coverage</b> found.</i>',sep='\n')
+cat('\n')
+cat('\n')
+```
 
 
-```{r header_actionable, results="asis", echo = F, eval = eval_somatic_actionable_loci}
+
+```{r header_actionable, results="asis", echo = F, eval = eval_section[['somatic_actionable']]}
 cat("## Sporadic cancers - actionable somatic mutations\n")
 
 cat("### Global distribution\n")
 ```
 
-```{r global_dist_somatic_actionable, echo = F, fig.width=12, fig.height=2, eval=eval_somatic_actionable_loci}
-p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_actionable']]) +
-  ggplot2::geom_bar(stat = 'identity') +
+```{r global_dist_somatic_actionable, echo = F, fig.width=12, fig.height=2, eval=eval_section[['somatic_actionable']]}
+
+tot_loci <- sum(cacao_report[['global_distribution']][['somatic_actionable']]$n)
+
+p3 <- ggplot2::ggplot(ggplot2::aes(x="", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_actionable']]) +
+  ggplot2::geom_bar(stat = 'identity', position = ggplot2::position_stack()) +
   ggplot2::coord_flip() +
-  ggplot2::scale_fill_manual('CALLABILITY', values = c("#FC4E2A","#FD8D3C","#78C679","#41AB5D"),
-                    labels = c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE')) +
   ggplot2::theme_classic() +
-  ggplot2::scale_y_continuous("Percent",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
+  ggplot2::geom_text(ggplot2::aes(y = 106), label = paste0("N = ",tot_loci), size = 4) +
+  ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
   ggplot2::theme(legend.title = ggplot2::element_blank(),
                  axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
-                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -2),
-                 axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, angle = -90, hjust = 0.5),
+                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
+                 axis.title.y = ggplot2::element_blank(),
                  plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
                  legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
 
-p
+p3 <- p3 + ggplot2::scale_fill_manual(values = color_callability_map)
+p3
 #plotly::ggplotly(p)
 htmltools::br()
+htmltools::br()
+
+```
+
+```{r cov_header_actionable, results="asis", echo = F, eval = eval_section[['somatic_actionable']]}
+cat("### Coverage per variant locus {.tabset}\n")
 ```
 
 
-```{r somatic_actionable_loci_predictive, echo=F, results = 'asis', eval = eval_somatic_actionable_loci}
+```{r somatic_actionable_loci_predictive, echo=F, results = 'asis', eval = eval_tab[['somatic_actionable']][['predictive']]}
 library(summarywidget)
 library(crosstalk)
-
-cat("### Coverage per locus {.tabset}\n")
 
 cat("#### Predictive\n")
 
 
 loci_predictive <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Predictive")
+loci_predictive$COVERAGE <- as.numeric(loci_predictive$COVERAGE)
+loci_predictive <- loci_predictive %>% dplyr::arrange(COVERAGE)
 loci_pred <- crosstalk::SharedData$new(loci_predictive)
 crosstalk::bscols(
   list(
@@ -282,15 +430,23 @@ crosstalk::bscols(
 
 crosstalk::bscols(
   DT::datatable(loci_pred, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
-  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+  DT::formatStyle('CALLABILITY', color='white', backgroundColor = DT::styleEqual(c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), color_callability))
 )
 
 htmltools::br()
 
 ```
 
+```{r somatic_actionable_predictive_missing, echo=F, results = 'asis', eval = !eval_tab[['somatic_actionable']][['predictive']]}
+cat("#### Predictive\n")
 
-```{r somatic_actionable_loci_diagnostic, echo=F, results = 'asis', eval = eval_somatic_actionable_loci}
+cat('<i>No actionable loci of <b>predictive</b> nature with sequencing coverage.</i>',sep='\n')
+cat('\n')
+cat('\n')
+```
+
+
+```{r somatic_actionable_loci_diagnostic, echo=F, results = 'asis', eval = eval_tab[['somatic_actionable']][['diagnostic']]}
 library(summarywidget)
 library(crosstalk)
 
@@ -298,6 +454,10 @@ cat("#### Diagnostic\n")
 
 
 loci_diagnostic <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Diagnostic")
+loci_diagnostic$COVERAGE <- as.numeric(loci_diagnostic$COVERAGE)
+loci_diagnostic <- loci_diagnostic %>% dplyr::arrange(COVERAGE)
+
+
 loci_dia <- crosstalk::SharedData$new(loci_diagnostic)
 crosstalk::bscols(
   list(
@@ -314,23 +474,35 @@ crosstalk::bscols(
 
 crosstalk::bscols(
   DT::datatable(loci_dia, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
-  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+  DT::formatStyle('CALLABILITY', color='white', backgroundColor = DT::styleEqual(c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), color_callability))
 )
 
 htmltools::br()
 
 ```
 
+```{r somatic_actionable_diagnostic_missing, echo=F, results = 'asis', eval = !eval_tab[['somatic_actionable']][['diagnostic']]}
+cat("#### Diagnostic\n")
 
-```{r somatic_actionable_loci_prognostic, echo=F, results = 'asis', eval = eval_somatic_actionable_loci}
+cat('<i>No actionable loci of <b>diagnostic</b> nature with sequencing coverage.</i>',sep='\n')
+cat('\n')
+cat('\n')
+```
+
+
+```{r somatic_actionable_loci_prognostic, echo=F, results = 'asis', eval = eval_tab[['somatic_actionable']][['prognostic']]}
 library(summarywidget)
 library(crosstalk)
 
 cat("#### Prognostic\n")
 
 
-loci_predictive <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Prognostic")
-loci_prog <- crosstalk::SharedData$new(loci_predictive)
+loci_prognostic <- dplyr::filter(cacao_report[['loci']][['somatic_actionable']][['all']], EVIDENCE_TYPE == "Prognostic")
+loci_prognostic$COVERAGE <- as.numeric(loci_prognostic$COVERAGE)
+loci_prognostic <- loci_prognostic %>% dplyr::arrange(COVERAGE)
+
+loci_prog <- crosstalk::SharedData$new(loci_prognostic)
+
 crosstalk::bscols(
   list(
     crosstalk::filter_select("CALLABILITY", "Callability", loci_prog, ~CALLABILITY),
@@ -346,53 +518,71 @@ crosstalk::bscols(
 
 crosstalk::bscols(
   DT::datatable(loci_prog, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
-  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+  DT::formatStyle('CALLABILITY', color='white', backgroundColor = DT::styleEqual(c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), color_callability))
 )
 
 htmltools::br()
 
 ```
 
+```{r somatic_actionable_prognostic_missing, echo=F, results = 'asis', eval = !eval_tab[['somatic_actionable']][['prognostic']]}
+cat("#### Prognostic\n")
+
+cat('<i>No actionable loci of <b>prognostic</b> nature with sequencing coverage.</i>',sep='\n')
+cat('\n')
+cat('\n')
+```
 
 
 
-```{r header_hotspot, results="asis", echo = F, eval = eval_somatic_hotspot_loci}
+```{r header_hotspot, results="asis", echo = F, eval = eval_section[['somatic_hotspot']]}
 cat("## Somatic cancer hotspots\n")
 
 cat("### Global distribution\n")
 ```
 
 
-```{r global_dist_somatic_hotspots, echo = F, fig.width=12, fig.height=2, eval=eval_somatic_hotspot_loci}
-p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_hotspot']]) +
-  ggplot2::geom_bar(stat = 'identity') +
+```{r global_dist_somatic_hotspots, echo = F, fig.width=12, fig.height=2, eval=eval_section[['somatic_hotspot']]}
+
+tot_loci <- sum(cacao_report[['global_distribution']][['somatic_hotspot']]$n)
+
+p4 <- ggplot2::ggplot(ggplot2::aes(x="", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_hotspot']]) +
+  ggplot2::geom_bar(stat = 'identity', position = ggplot2::position_stack()) +
   ggplot2::coord_flip() +
-  ggplot2::scale_fill_manual('CALLABILITY', values = c("#FC4E2A","#FD8D3C","#78C679","#41AB5D"),
-                    labels = c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE')) +
   ggplot2::theme_classic() +
-  ggplot2::scale_y_continuous("Percent",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
+  ggplot2::geom_text(ggplot2::aes(y = 106), label = paste0("N = ",tot_loci), size = 4) +
+  ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
   ggplot2::theme(legend.title = ggplot2::element_blank(),
                  axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
-                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -2),
-                 axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, angle = -90, hjust = 0.5),
+                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
+                 axis.title.y = ggplot2::element_blank(),
                  plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
                  legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
 
-p
+p4 <- p4 + ggplot2::scale_fill_manual(values = color_callability_map)
+p4
 #plotly::ggplotly(p)
 htmltools::br()
+htmltools::br()
+
 ```
 
 
 
 
-```{r somatic_hotspot_loci, echo=F, results = 'asis', eval = eval_somatic_hotspot_loci}
+```{r somatic_hotspot_loci, echo=F, results = 'asis', eval = eval_section[['somatic_hotspot']]}
 library(summarywidget)
 library(crosstalk)
 
 cat("### Coverage per locus\n")
 
+
+cacao_report[['loci']][['somatic_hotspot']][['all']]$COVERAGE <- as.numeric(cacao_report[['loci']][['somatic_hotspot']][['all']]$COVERAGE)
+cacao_report[['loci']][['somatic_hotspot']][['all']] <- cacao_report[['loci']][['somatic_hotspot']][['all']] %>% dplyr::arrange(COVERAGE)
+
 loci_hotspot <- crosstalk::SharedData$new(cacao_report[['loci']][['somatic_hotspot']][['all']])
+
+
 crosstalk::bscols(
   list(
     crosstalk::filter_select("CALLABILITY", "Callability", loci_hotspot, ~CALLABILITY),
@@ -407,7 +597,7 @@ crosstalk::bscols(
 
 crosstalk::bscols(
   DT::datatable(loci_hotspot, escape=F,extensions=c("Buttons","Responsive"), width = "100%",options=list(buttons = c('csv','excel'),dom = 'Bfrtip')) %>%
-  DT::formatStyle('CALLABILITY', backgroundColor = DT::styleEqual(c('NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), c("#FC4E2A","#FD8D3C","#78C679","#41AB5D")))
+  DT::formatStyle('CALLABILITY', color='white',backgroundColor = DT::styleEqual(c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), color_callability))
 )
 
 htmltools::br()
