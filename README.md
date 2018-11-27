@@ -20,9 +20,10 @@ All three tracks (*hereditary*, *somatic_actionable*, and *somatic_hotspot*) are
    * clinical evidence items (therapeutic context, evidence level, from CIViC)
    * tumor types (cancerhotspots.org)
 
-## Example report
+## Example reports
  - An [example report](https://folk.uio.no/sigven/test.cacao.grch37.html) from the CACAO workflow showing callable cancer loci in an RNA sequence alignment.
  - A [targeted, example report](https://folk.uio.no/sigven/test_targeted.cacao.grch37.html) showing callable cancer loci in BRCA genes only
+	 - This is generated through the `--query_target` option
 
 ## Getting started
 

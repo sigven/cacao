@@ -177,9 +177,10 @@ htmltools::br()
 ```
 
 
+### Gene distribution
+
 ```{r gene_dist, echo = F, fig.width=12, fig.height=fig_height_gene_distribution, eval=eval_section[['hereditary_loci']]}
 
-cat("### Gene distribution\n")
 
 p1 <- ggplot2::ggplot(cacao_report[['gene_distribution']][['hereditary']],ggplot2::aes(x=SYMBOL, y=frac, fill=CALLABILITY)) +
   ggplot2::geom_bar(position = ggplot2::position_stack(), stat="identity") +
