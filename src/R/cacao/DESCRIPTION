@@ -1,11 +1,10 @@
 Package: cacao
 Type: Package
 Title: Callable Cancer Loci
-Version: 1.0.0
+Version: 0.2.1
 Author: Sigve Nakken
 Maintainer: Sigve Nakken <sigven@ifi.uio.no>
 Description: Sequence coverage report for actionable and pathogenic loci in cancer
-    Use four spaces when indenting paragraphs within the Description.
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true

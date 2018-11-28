@@ -21,17 +21,17 @@ color_callability <- c("#E0DFDF","#FC4E2A","#FD8D3C","#78C679","#207733")
 
 eval_section <- list()
 eval_global_plot <- list()
-for(c in c('hereditary_loci','somatic_actionable','somatic_hotspot','all')){
+for(c in c('hereditary','somatic_actionable','somatic_hotspot','all')){
   eval_section[[c]] <- F
   eval_global_plot[[c]] <- list()
 }
 
 eval_tab <- list()
 missing_tab <- list()
-for(d in c('somatic_actionable','somatic_hotspot','hereditary_loci')){
+for(d in c('somatic_actionable','somatic_hotspot','hereditary')){
   eval_tab[[d]] <- list()
   missing_tab[[d]] <- list()
-  if(d == 'hereditary_loci'){
+  if(d == 'hereditary'){
     for(level in c('high','callable','low','no_coverage')){
       eval_tab[[d]][[level]] <- F
       missing_tab[[d]][[level]] <- T
@@ -47,11 +47,11 @@ for(d in c('somatic_actionable','somatic_hotspot','hereditary_loci')){
 
 mode <- ''
 if(cacao_report[['eval']][['hereditary']] == T){
-  eval_section[['hereditary_loci']] <- T
+  eval_section[['hereditary']] <- T
   for(clevel in c('high','callable','low','no_coverage')){
     if(nrow(cacao_report[['loci']][['hereditary']][[clevel]]) > 0){
-      eval_tab[['hereditary_loci']][[clevel]] <- T
-      missing_tab[['hereditary_loci']][[clevel]] <- F
+      eval_tab[['hereditary']][[clevel]] <- T
+      missing_tab[['hereditary']][[clevel]] <- F
     }
   }
 }
@@ -88,7 +88,7 @@ if(cacao_report[['mode']] == 'somatic'){
   mode <- 'Actionable somatic loci AND somatic hotspots'
 }
 
-fig_height_gene_distribution <- ceiling(length(unique(cacao_report[['gene_distribution']][['hereditary']]$SYMBOL)) / 7.2) + 3
+fig_height_gene_distribution <- ceiling(length(unique(cacao_report[['coverage_distribution']][['hereditary']][['gene']][['data']]$SYMBOL)) / 7.2) + 3
 
 subchunkify <- function(g, fig_height=25, fig_width=12) {
   g_deparsed <- paste0(deparse(
@@ -133,7 +133,7 @@ cat("</ul>\n")
 
 ```
 
-```{r levels_germline, results="asis", echo = F, eval = eval_section[['hereditary_loci']]}
+```{r levels_germline, results="asis", echo = F, eval = eval_section[['hereditary']]}
 cat("* Callability levels (<b>germline</b>):\n")
 cat("<ul>\n")
 cat(paste0("<li><i>NO_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['no_coverage']],"</li>\n"))
@@ -144,33 +144,16 @@ cat("</ul>\n")
 
 ```
 
-```{r header_germline, results="asis", echo = F, eval = eval_section[['hereditary_loci']]}
+```{r header_germline, results="asis", echo = F, eval = eval_section[['hereditary']]}
 cat("## Hereditary cancer - pathogenic loci\n")
 
 cat("### Global distribution\n")
 ```
 
-```{r global_dist, echo = F, fig.width=12, fig.height=2, eval=eval_section[['hereditary_loci']]}
+```{r global_dist, echo = F, fig.width=12, fig.height=2, eval=eval_section[['hereditary']]}
 
-tot_loci <- sum(cacao_report[['global_distribution']][['hereditary']]$n)
-
-p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['hereditary']]) +
-  ggplot2::geom_bar(stat = 'identity', position = ggplot2::position_stack()) +
-  ggplot2::coord_flip() +
-  ggplot2::theme_classic() +
-  ggplot2::geom_text(ggplot2::aes(y = 106), label = paste0("N = ",tot_loci), size = 4) +
-  ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
-  ggplot2::theme(legend.title = ggplot2::element_blank(),
-                 axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
-                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
-                 axis.title.y = ggplot2::element_blank(),
-                 axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, angle = -90, hjust = 0.5),
-                 plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
-                 legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
-
-p <- p + ggplot2::scale_fill_manual(values = color_callability_map)
+p <- cacao_report[['coverage_distribution']][['hereditary']][['global']][['plot']]
 p
-#plotly::ggplotly(p)
 htmltools::br()
 htmltools::br()
 
@@ -179,26 +162,10 @@ htmltools::br()
 
 ### Gene distribution
 
-```{r gene_dist, echo = F, fig.width=12, fig.height=fig_height_gene_distribution, eval=eval_section[['hereditary_loci']]}
+```{r gene_dist, echo = F, fig.width=12, fig.height=fig_height_gene_distribution, eval=eval_section[['hereditary']]}
 
-
-p1 <- ggplot2::ggplot(cacao_report[['gene_distribution']][['hereditary']],ggplot2::aes(x=SYMBOL, y=frac, fill=CALLABILITY)) +
-  ggplot2::geom_bar(position = ggplot2::position_stack(), stat="identity") +
-  ggplot2::geom_text(ggplot2::aes(x = SYMBOL, y = tot_frac + 5, label = paste0("N = ",tot_loci)), size = 4) +
-  ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
-  ggplot2::coord_flip() +
-  ggplot2::theme_classic() +
-  ggplot2::theme(axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
-                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
-                 axis.title.y = ggplot2::element_blank(),
-                 legend.title = ggplot2::element_blank(),
-                 axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, hjust = 0.5),
-                 plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
-                 legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
-p1 <- p1 + ggplot2::scale_fill_manual(values = color_callability_map)
-
-#p1 <- plotly::ggplotly(p1)
-p1
+p2 <- cacao_report[['coverage_distribution']][['hereditary']][['gene']][['plot']]
+p2
 htmltools::br()
 htmltools::br()
 
@@ -208,12 +175,12 @@ htmltools::br()
 
 
 
-```{r cov_header_germline, results="asis", echo = F, eval = eval_section[['hereditary_loci']]}
+```{r cov_header_germline, results="asis", echo = F, eval = eval_section[['hereditary']]}
 cat("### Coverage per variant locus {.tabset}\n")
 ```
 
 
-```{r high_coverage, echo=F, results = 'asis', eval = eval_tab[['hereditary_loci']][['high']]}
+```{r high_coverage, echo=F, results = 'asis', eval = eval_tab[['hereditary']][['high']]}
 
 
 cat("#### High coverage\n")
@@ -243,7 +210,7 @@ htmltools::br()
 
 ```
 
-```{r hereditary_high_cov_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary_loci']][['high']]}
+```{r hereditary_high_cov_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary']][['high']]}
 cat("#### High coverage\n")
 
 cat('<i>No loci with <b>high sequencing coverage</b> found.</i>',sep='\n')
@@ -253,7 +220,7 @@ cat('\n')
 <br><br>
 
 
-```{r hereditary_callable, echo=F, results = 'asis', eval = eval_tab[['hereditary_loci']][['callable']]}
+```{r hereditary_callable, echo=F, results = 'asis', eval = eval_tab[['hereditary']][['callable']]}
 
 cat("#### Callable\n")
 
@@ -282,7 +249,7 @@ htmltools::br()
 
 ```
 
-```{r hereditary_callable_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary_loci']][['callable']]}
+```{r hereditary_callable_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary']][['callable']]}
 cat("#### Callable\n")
 
 cat('<i>No <b>callable</b> loci found.</i>',sep='\n')
@@ -290,7 +257,7 @@ cat('\n')
 cat('\n')
 ```
 
-```{r hereditary_low_coverage, echo=F, results = 'asis', eval = eval_tab[['hereditary_loci']][['low']]}
+```{r hereditary_low_coverage, echo=F, results = 'asis', eval = eval_tab[['hereditary']][['low']]}
 library(summarywidget)
 library(crosstalk)
 
@@ -319,7 +286,7 @@ htmltools::br()
 
 ```
 
-```{r hereditary_low_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary_loci']][['low']]}
+```{r hereditary_low_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary']][['low']]}
 cat("#### Low coverage\n")
 
 cat('<i>No loci with <b>low coverage</b> loci.</i>',sep='\n')
@@ -329,7 +296,7 @@ cat('\n')
 
 
 
-```{r hereditary_no_coverage, echo=F, results = 'asis', eval = eval_tab[['hereditary_loci']][['no_coverage']]}
+```{r hereditary_no_coverage, echo=F, results = 'asis', eval = eval_tab[['hereditary']][['no_coverage']]}
 library(summarywidget)
 library(crosstalk)
 
@@ -358,7 +325,7 @@ htmltools::br()
 
 ```
 
-```{r hereditary_nocov_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary_loci']][['no_coverage']]}
+```{r hereditary_nocov_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary']][['no_coverage']]}
 cat("#### No coverage\n")
 
 cat('<i>No loci with <b>zero coverage</b> found.</i>',sep='\n')
@@ -376,24 +343,8 @@ cat("### Global distribution\n")
 
 ```{r global_dist_somatic_actionable, echo = F, fig.width=12, fig.height=2, eval=eval_section[['somatic_actionable']]}
 
-tot_loci <- sum(cacao_report[['global_distribution']][['somatic_actionable']]$n)
-
-p3 <- ggplot2::ggplot(ggplot2::aes(x="", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_actionable']]) +
-  ggplot2::geom_bar(stat = 'identity', position = ggplot2::position_stack()) +
-  ggplot2::coord_flip() +
-  ggplot2::theme_classic() +
-  ggplot2::geom_text(ggplot2::aes(y = 106), label = paste0("N = ",tot_loci), size = 4) +
-  ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
-  ggplot2::theme(legend.title = ggplot2::element_blank(),
-                 axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
-                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
-                 axis.title.y = ggplot2::element_blank(),
-                 plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
-                 legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
-
-p3 <- p3 + ggplot2::scale_fill_manual(values = color_callability_map)
+p3 <- cacao_report[['coverage_distribution']][['somatic_actionable']][['global']][['plot']]
 p3
-#plotly::ggplotly(p)
 htmltools::br()
 htmltools::br()
 
@@ -545,24 +496,8 @@ cat("### Global distribution\n")
 
 ```{r global_dist_somatic_hotspots, echo = F, fig.width=12, fig.height=2, eval=eval_section[['somatic_hotspot']]}
 
-tot_loci <- sum(cacao_report[['global_distribution']][['somatic_hotspot']]$n)
-
-p4 <- ggplot2::ggplot(ggplot2::aes(x="", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_hotspot']]) +
-  ggplot2::geom_bar(stat = 'identity', position = ggplot2::position_stack()) +
-  ggplot2::coord_flip() +
-  ggplot2::theme_classic() +
-  ggplot2::geom_text(ggplot2::aes(y = 106), label = paste0("N = ",tot_loci), size = 4) +
-  ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
-  ggplot2::theme(legend.title = ggplot2::element_blank(),
-                 axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
-                 axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
-                 axis.title.y = ggplot2::element_blank(),
-                 plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
-                 legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
-
-p4 <- p4 + ggplot2::scale_fill_manual(values = color_callability_map)
+p4 <- cacao_report[['coverage_distribution']][['somatic_hotspot']][['global']][['plot']]
 p4
-#plotly::ggplotly(p)
 htmltools::br()
 htmltools::br()
 

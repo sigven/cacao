@@ -8,7 +8,7 @@ import subprocess
 import logging
 import sys
 
-cacao_version = '0.2.0'
+cacao_version = '0.2.1'
 
 
 def __main__():
@@ -71,7 +71,6 @@ def __main__():
    coverage_bed_track_target = os.path.join(str(args.output_directory),str(args.sample_id) + str(sample_postfix) + '.regions_target.bed')
    if track_info['query_target_bed'] != "NA":
       logger.info('Limiting coverage assessment to query target regions')
-      #intersect_target_bed = 'bedtools intersect -wa -u -a ' + str(coverage_bed_track) + ' -b ' + str(track_info['query_target_bed'] ) + ' > ' + str(coverage_bed_track_target)
       annotate_target_bed = 'bedtools annotate -i ' + str(coverage_bed_track) + ' -files ' + str(track_info['query_target_bed'] ) + ' > ' + str(coverage_bed_track_target)
       check_subprocess(annotate_target_bed)
    else:
@@ -96,7 +95,6 @@ def __main__():
    cacao_report_parameters.append(str(args.output_directory))
 
    report_R_command = "/cacao.R " + " ".join(cacao_report_parameters)
-   #print(str(report_R_command))
    check_subprocess(report_R_command)
 
    logger.info('Finished')
@@ -129,26 +127,27 @@ def check_input_files(aln_fname, target_bed_fname, sample_id, output_directory, 
       for line in f:
          target_bed_data = line.rstrip().split('\t')
          if len(target_bed_data) >= 2:
-            if not (target_bed_data[1].isdigit() and target_bed_data[2].isdigit()):
-               #valid_bed = False
-               msg = "Non-integer coordinates in target BED file: " + str(target_bed_data[0]) + " " + str(target_bed_data[1]) + " " + str(target_bed_data[2])
-               error_message(msg, logger)
-            if target_bed_data[0].startswith('chr'):
+            chromosome = str(target_bed_data[0])
+            start = target_bed_data[1]
+            end = target_bed_data[2]
+            if not (start.isdigit() and end.isdigit()):
+               err_msg = "Non-positive integer coordinates in target BED file: " + chromosome + " " + str(start) + " " + str(end)
+               error_message(err_msg, logger)
+            else:
+               if int(end) <= int(start):
+                  err_msg = "End coordinate is less than or equal to start coordinate in target BED file: " + chromosome + " " + str(start) + " " + str(end)
+                  error_message(err_msg, logger)
+               if int(end) < 1 or int(start) < 1: ## check that 'Start' and 'End' is always non-negative
+                  err_msg = '\'Start\' or \'end\' is less than or equal to zero in target BED file: ' + chromosome + '\t' + str(start) + '\t' + str(end)
+                  error_message(err_msg, logger)
+
+            if chromosome.startswith('chr'):
                chr_naming_bed = True
 
       f.close()
 
    if (chr_naming is False and chr_naming_bed is True) or (chr_naming is True and chr_naming_bed is False):
       error_message('Chromosome naming in target BED file and alignment file does not correspond', logger)
-
-   #if valid_bed is True:
-      #error_message('Chromosome naming in target BED file and alignment file does not correspond', logger)
-      #aln_target_fname = 'balle.target.bam'
-      #intersect_target_bam = 'bedtools intersect -wa -u -a ' + str(aln_fname) + ' -b ' + str(target_bed_fname) + ' > ' + str(aln_target_fname)
-      #os.system(intersect_target_bam)
-      ## intersect BAM file with target BED
-
-   
 
    track_info = {}
    track_info['cacao_loci_bed'] = "NA"

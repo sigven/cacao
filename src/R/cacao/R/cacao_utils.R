@@ -54,8 +54,13 @@ init_report <- function(mode, fname_aln, fname_target, sample_name, version, gen
     for(class in c('all','callable','no_coverage','low','high')){
       cacao_report[['loci']][[c]][[class]] <- data.frame()
     }
-    cacao_report[['global_distribution']][[c]] <- data.frame()
-    cacao_report[['gene_distribution']][[c]] <- data.frame()
+    cacao_report[['coverage_distribution']][[c]] <- list()
+    for(p in c('global','gene','chromosome')){
+      cacao_report[['coverage_distribution']][[c]][[p]] <- list()
+      cacao_report[['coverage_distribution']][[c]][[p]][['data']] <- data.frame()
+      cacao_report[['coverage_distribution']][[c]][[p]][['plot']] <- NULL
+    }
+
     cacao_report[['eval']][[c]] <- FALSE
   }
 
@@ -120,6 +125,8 @@ read_raw_coverage <- function(bed_coverage_fname){
     }
     coverage_all_loci <- dplyr::select(coverage_all_loci, -TARGET_OVERLAP)
   }
+
+
 
   coverage_pr_loci <- list()
   coverage_pr_loci[['all']] <- coverage_all_loci
@@ -248,17 +255,17 @@ global_coverage_distribution <- function(coverage_pr_loci = NULL){
 #'
 #' @return c
 #'
-coverage_distribution_pr_gene <- function(coverage_pr_loci = NULL, mode = 'hereditary'){
+coverage_distribution_pr_gene <- function(coverage_pr_loci = NULL){
 
   callability_pr_gene <- as.data.frame(
-    coverage_pr_loci[[mode]] %>%
+    coverage_pr_loci %>%
       dplyr::select(SYMBOL,REGION,CALLABILITY) %>%
       dplyr::distinct() %>%
       dplyr::group_by(SYMBOL) %>%
       dplyr::summarise(n_loci = n()))
 
   b <- as.data.frame(
-    coverage_pr_loci[[mode]] %>%
+    coverage_pr_loci %>%
       dplyr::select(SYMBOL,REGION,CALLABILITY) %>%
       dplyr::distinct() %>%
       dplyr::group_by(SYMBOL, CALLABILITY) %>%
@@ -296,3 +303,73 @@ coverage_distribution_pr_gene <- function(coverage_pr_loci = NULL, mode = 'hered
   return(c)
 }
 
+
+#' Function that generates a ggplot of the variant loci coverage pr. gene
+#' @param gene_coverage_distribution data frame with mosdepth-annotated loci (coverage at pathogenic/actionable cancer loci)
+#' @param color_callability_map named vector mapping colors to callability levels
+#' @param plotly logical indicating if ggplot should be makde with plotly
+#'
+#' @return p
+#'
+plot_gene_distribution <- function(gene_coverage_distribution, color_callability_map = NULL, plotly = FALSE){
+
+  if(is.null(color_callability_map)){
+    color_callability_map <- c("NON_TARGET" = "#E0DFDF", "NO_COVERAGE" = "#FC4E2A", "LOW_COVERAGE" = "#FD8D3C", "CALLABLE" = "#78C679", "HIGH_COVERAGE" = "#207733")
+  }
+  p <- ggplot2::ggplot(gene_coverage_distribution,ggplot2::aes(x=SYMBOL, y=frac, fill=CALLABILITY)) +
+    ggplot2::geom_bar(position = ggplot2::position_stack(), stat="identity") +
+    ggplot2::geom_text(ggplot2::aes(x = SYMBOL, y = tot_frac + 5, label = paste0("N = ",tot_loci)), size = 4) +
+    ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) +
+    ggplot2::coord_flip() +
+    ggplot2::theme_classic() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
+                   axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
+                   axis.title.y = ggplot2::element_blank(),
+                   legend.title = ggplot2::element_blank(),
+                   axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, hjust = 0.5),
+                   plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
+                   legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
+  p <- p + ggplot2::scale_fill_manual(values = color_callability_map)
+  if(plotly == TRUE){
+    p <- plotly::ggplotly(p)
+  }
+  return(p)
+
+}
+
+#' Function that generates a ggplot of the variant loci coverage pr. gene
+#' @param gene_coverage_distribution data frame with mosdepth-annotated loci (coverage at pathogenic/actionable cancer loci)
+#' @param color_callability_map named vector mapping colors to callability levels
+#' @param plotly logical indicating if ggplot should be makde with plotly
+#'
+#' @return p
+#'
+plot_global_distribution <- function(global_coverage_distribution, color_callability_map = NULL, plotly = FALSE){
+
+  if(is.null(color_callability_map)){
+    color_callability_map <- c("NON_TARGET" = "#E0DFDF", "NO_COVERAGE" = "#FC4E2A", "LOW_COVERAGE" = "#FD8D3C", "CALLABLE" = "#78C679", "HIGH_COVERAGE" = "#207733")
+  }
+  tot_loci <- sum(global_coverage_distribution$n)
+
+  p <- ggplot2::ggplot(ggplot2::aes(x="CALLABILITY", y=PERCENT, fill = CALLABILITY), data = global_coverage_distribution) +
+    ggplot2::geom_bar(stat = 'identity', position = ggplot2::position_stack()) +
+    ggplot2::coord_flip() +
+    ggplot2::theme_classic() +
+    ggplot2::geom_text(ggplot2::aes(y = 106), label = paste0("N = ",tot_loci), size = 4) +
+    ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) +
+    ggplot2::theme(legend.title = ggplot2::element_blank(),
+                   axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
+                   axis.title.x = ggplot2::element_text(family = "Helvetica", size = 13, vjust = -2.5),
+                   axis.title.y = ggplot2::element_blank(),
+                   axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, angle = -90, hjust = 0.5),
+                   plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
+                   legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
+
+  p <- p + ggplot2::scale_fill_manual(values = color_callability_map)
+  p
+  if(plotly == TRUE){
+    p <- plotly::ggplotly(p)
+  }
+  return(p)
+
+}

@@ -10,10 +10,11 @@ Three clinical genomic tracks in BED format have been created:
 	* Variants have been retrieved from [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar) (November 2018 release)
 * Loci associated with actionable somatic variants (related to prognosis, diagnosis, or drug sensitivity, e.g. BRAF V600E)
 	* Variants have been retrieved from [CIViC](https://civicdb.org) (data obtained November 12th 2018)
+	* Only variants that we are able to map unambigusously to the genome are included
 * Loci identified as somatic mutational hotspots (i.e. likely driver alterations) in cancer
 	* Variants have been retrieved from [cancerhotspots.org](https://www.cancerhotspots.org) (v2)
 
-At each variant identified from the three sources above, we have used a surrounding sequence window of approximately 10bp for which the mean depth is calculated and representing the *loci coverage*.
+**IMPORTANT**: At each variant identified from the three sources above, we have used a surrounding sequence window of approximately 10bp for which the mean depth is calculated and representing the *loci coverage*.
 
 All three tracks (*hereditary*, *somatic_actionable*, and *somatic_hotspot*) are available for GRCh37 and GRCh38, and there is also tab-separated files that link each locus to its associated
    * variants and phenotypes (ClinVar),
@@ -31,9 +32,9 @@ All three tracks (*hereditary*, *somatic_actionable*, and *somatic_hotspot*) are
 
 * Prerequisites:
 	* Make sure that [Docker](https://www.docker.com/) is installed and running
-	* The CACAO workflow script requires that Python3 is installed
+	* The CACAO workflow script `cacao_wflow.py` requires that Python3 is installed
 * Clone the repository `git clone https://github.com/sigven/cacao.git`
-* Pull the docker image `docker pull sigven/cacao:0.2.0`
+* Pull the docker image `docker pull sigven/cacao:0.2.1`
 
 ### Usage
 

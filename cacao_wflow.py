@@ -9,7 +9,7 @@ import logging
 import sys
 import toml
 
-cacao_version = '0.2.0'
+cacao_version = '0.2.1'
 
 
 def __main__():
@@ -29,12 +29,16 @@ def __main__():
    parser.add_argument('genome_assembly',choices = ['grch37','grch38'], help='Human genome assembly build: grch37 or grch38')
    parser.add_argument('mode',choices=['hereditary','somatic','any'],help="Choice of loci and clinical cancer context (cancer predisposition/tumor sequencing)")
    parser.add_argument('sample_id', help="Sample identifier - prefix for output files")
-
+   
    docker_image_version = 'sigven/cacao:' + str(cacao_version)
    args = parser.parse_args()
    logger = getlogger('cacao-run')
    logger.info('Start')
-   host_directories = verify_arguments(args.query_alignment, args.query_target, args.track_directory, args.output_directory, args.callability_levels_germline, args.callability_levels_somatic, args.force_overwrite, logger)
+   overwrite = 0
+   if args.force_overwrite is True:
+      overwrite = 1
+
+   host_directories = verify_arguments(args.query_alignment, args.query_target, args.track_directory, args.output_directory, args.sample_id, args.genome_assembly, args.callability_levels_germline, args.callability_levels_somatic, overwrite, logger)
 
    input_aln_host = "NA"
    input_aln_index_host = "NA"
@@ -64,7 +68,7 @@ def error_message(message, logger):
 def warn_message(message, logger):
    logger.warning(message)
 
-def verify_arguments(query_alignment_fname, query_target_fname, track_directory, output_dir, callability_levels_germline, callability_levels_somatic, overwrite, logger):
+def verify_arguments(query_alignment_fname, query_target_fname, track_directory, output_dir, sample_id, genome_assembly, callability_levels_germline, callability_levels_somatic, overwrite, logger):
    """
    Function that checks the input files and directories provided by the user and checks for their existence
    """
@@ -110,6 +114,13 @@ def verify_arguments(query_alignment_fname, query_target_fname, track_directory,
       
       input_target_basename = os.path.basename(str(query_target_fname))
       input_target_dir = os.path.dirname(os.path.abspath(query_target_fname))
+
+
+   ## if output html exist and overwrite not set
+   output_html = os.path.join(str(output_dir),str(sample_id) + '_' + str(genome_assembly) + '_coverage_cacao.html')
+   if os.path.exists(output_html) and overwrite == 0:
+      err_msg = "Output files (e.g. " + str(output_html) + ") already exist - please specify different sample_id or add option --force_overwrite"
+      error_message(err_msg,logger)
 
    bam = 0 
    ## check if input VCF exists
