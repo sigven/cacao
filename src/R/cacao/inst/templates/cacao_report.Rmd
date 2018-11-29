@@ -34,7 +34,7 @@ for(d in c('somatic_actionable','somatic_hotspot','hereditary')){
   if(d == 'hereditary'){
     for(level in c('high','callable','low','no_coverage')){
       eval_tab[[d]][[level]] <- F
-      missing_tab[[d]][[level]] <- T
+      missing_tab[[d]][[level]] <- F
     }
   }
   if(d == 'somatic_actionable'){
@@ -51,7 +51,9 @@ if(cacao_report[['eval']][['hereditary']] == T){
   for(clevel in c('high','callable','low','no_coverage')){
     if(nrow(cacao_report[['loci']][['hereditary']][[clevel]]) > 0){
       eval_tab[['hereditary']][[clevel]] <- T
-      missing_tab[['hereditary']][[clevel]] <- F
+    }
+    else{
+      missing_tab[['hereditary']][[level]] <- T
     }
   }
 }
@@ -160,7 +162,12 @@ htmltools::br()
 ```
 
 
-### Gene distribution
+```{r gene_header, echo = F, fig.width=12, fig.height=2, eval=eval_section[['hereditary']]}
+
+cat('### Gene distribution')
+
+```
+
 
 ```{r gene_dist, echo = F, fig.width=12, fig.height=fig_height_gene_distribution, eval=eval_section[['hereditary']]}
 
@@ -210,7 +217,7 @@ htmltools::br()
 
 ```
 
-```{r hereditary_high_cov_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary']][['high']]}
+```{r hereditary_high_cov_missing, echo=F, results = 'asis', eval = missing_tab[['hereditary']][['high']]}
 cat("#### High coverage\n")
 
 cat('<i>No loci with <b>high sequencing coverage</b> found.</i>',sep='\n')
@@ -249,7 +256,7 @@ htmltools::br()
 
 ```
 
-```{r hereditary_callable_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary']][['callable']]}
+```{r hereditary_callable_missing, echo=F, results = 'asis', eval = missing_tab[['hereditary']][['callable']]}
 cat("#### Callable\n")
 
 cat('<i>No <b>callable</b> loci found.</i>',sep='\n')
@@ -286,7 +293,7 @@ htmltools::br()
 
 ```
 
-```{r hereditary_low_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary']][['low']]}
+```{r hereditary_low_missing, echo=F, results = 'asis', eval = missing_tab[['hereditary']][['low']]}
 cat("#### Low coverage\n")
 
 cat('<i>No loci with <b>low coverage</b> loci.</i>',sep='\n')
@@ -325,7 +332,7 @@ htmltools::br()
 
 ```
 
-```{r hereditary_nocov_missing, echo=F, results = 'asis', eval = !eval_tab[['hereditary']][['no_coverage']]}
+```{r hereditary_nocov_missing, echo=F, results = 'asis', eval = missing_tab[['hereditary']][['no_coverage']]}
 cat("#### No coverage\n")
 
 cat('<i>No loci with <b>zero coverage</b> found.</i>',sep='\n')
