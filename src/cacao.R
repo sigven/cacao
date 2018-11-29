@@ -91,6 +91,12 @@ cacao_content_json <- cacao_report
 for(c in c('hereditary','somatic_actionable','somatic_hotspot')){
   cacao_content_json[['coverage_distribution']][[c]][['global']][['plot']] <- NULL
   cacao_content_json[['coverage_distribution']][[c]][['gene']][['plot']] <- NULL
+  for(l in c('all','no_coverage','low','callable','high')){
+    if(nrow(cacao_content_json[['loci']][[c]][[l]]) > 0){
+      cacao_content_json[['loci']][[c]][[l]] <- cacao::strip_html_links(cacao_content_json[['loci']][[c]][[l]])
+    }
+  }
+  
 }
 cacao_json <- jsonlite::toJSON(cacao_content_json, pretty=T,na='string',null = 'null',force=T)
 write(cacao_json, fname_json)
@@ -100,51 +106,5 @@ rlogging::message('------')
 rlogging::message("Rendering HTML report with rmarkdown")
 
 rmarkdown::render(system.file("templates","cacao_report.Rmd", package="cacao"), output_format = rmarkdown::html_document(theme = "default", toc = T, toc_depth = 3, toc_float = T, number_sections = F), output_file = fname_html, output_dir = out_dir, clean = T, intermediates_dir = out_dir, quiet = T)
-
-
-# m <- cacao::coverage_distribution_pr_gene(coverage_pr_loci, mode = 'hereditary')
-# n_loci <- m %>% dplyr::select(SYMBOL,tot_loci,tot_frac) %>% dplyr::distinct()
-# 
-# cols <- c("NO_COVERAGE" = "#FC4E2A", "LOW_COVERAGE" = "#FD8D3C", "CALLABLE" = "#78C679", "HIGH_COVERAGE" = "#41AB5D")
-# cols <- c("NO_COVERAGE" = "#FC4E2A", "LOW_COVERAGE" = "#FD8D3C", "CALLABLE" = "#78C679", "HIGH_COVERAGE" = "#207733")
-# 
-# p <- ggplot(tail(m,60),aes(x=SYMBOL, y=frac, fill=CALLABILITY)) +
-#   labs (y = "Percentage of pathogenic loci") +
-#   geom_bar(position = position_stack(), stat="identity") +
-#   geom_text(aes(x = SYMBOL, y = tot_frac + 4, label = paste0("N = ",tot_loci)), size = 4) +
-#   coord_flip() +
-#   ggplot2::theme_classic() +
-#   ggplot2::theme(axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
-#                  axis.title.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -2),
-#                  axis.title.y = ggplot2::element_blank(),
-#                  legend.title = ggplot2::element_blank(),
-#                  axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, hjust = 0.5),
-#                  plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
-#                  legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
-# p <- p + ggplot2::scale_fill_manual(values = cols)
-# p <- plotly::ggplotly(p)
-# p
-
-
-# tot_loci <- sum(cacao_report[['global_distribution']][['somatic_actionable']]$n)
-# 
-# p <- ggplot2::ggplot(ggplot2::aes(x="", y=PERCENT, fill = CALLABILITY), data = cacao_report[['global_distribution']][['somatic_actionable']]) +
-#   ggplot2::geom_bar(stat = 'identity', position = ggplot2::position_stack()) +
-#   ggplot2::coord_flip() +
-#   ggplot2::theme_classic() +
-#   ggplot2::geom_text(ggplot2::aes(y = 104), label = paste0("N = ",tot_loci), size = 4) +
-#   ggplot2::scale_y_continuous("Percent of all variant loci",breaks=seq(0,100,by=10),labels=seq(0,100,by=10)) + 
-#   ggplot2::theme(legend.title = ggplot2::element_blank(),
-#                  axis.text.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -0.1),
-#                  axis.title.x = ggplot2::element_text(family = "Helvetica", size = 12, vjust = -2.5),
-#                  axis.title.y = ggplot2::element_blank(),
-#                  #axis.text.y = ggplot2::element_text(family = "Helvetica", size = 12, angle = -90, hjust = 0.5),
-#                  plot.margin = (grid::unit(c(0.5, 1, 1, 0.5), "cm")),
-#                  legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
-# 
-# p <- p + ggplot2::scale_fill_manual(values = color_callability_map)
-# p
-# #plotly::ggplotly(p)
-# htmltools::br()
 
 

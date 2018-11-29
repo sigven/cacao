@@ -2,7 +2,7 @@
 library(magrittr)
 medgen_map <- readRDS(file="data-raw/medgen_map.rds")
 
-datestamp <- '20181105'
+datestamp <- '20181129'
 
 all_tracks <- list()
 for(ttype in c('bed','tsv')){
@@ -208,17 +208,6 @@ for(build in c('grch37','grch38')){
   all_tracks[['bed']][[build]][['clinvar_path']] <- cpg_pathogenic_bed
   all_tracks[['tsv']][[build]][['clinvar_path']] <- cpg_pathogenic_tsv
   
-  # cpg_pathogenic_bed_sorted <- sort_bed_regions(cpg_pathogenic_bed)
-  # 
-  # 
-  # write.table(cpg_pathogenic_bed_sorted,file=paste0("data/cancer_hereditary_pathogenic_loci.",datestamp,".",build,".bed"),sep="\t",row.names=F,quote=F,col.names=F)
-  # cpg_pathogenic_bed_sorted$chrom <- paste0('chr',cpg_pathogenic_bed_sorted$chrom)
-  # write.table(cpg_pathogenic_bed_sorted,file=paste0("data/cancer_hereditary_pathogenic_loci.",datestamp,".",build,".chr.bed"),sep="\t",row.names=F,quote=F,col.names=F)
-  # write.table(cpg_pathogenic_tsv,file=paste0("data/cancer_hereditary_pathogenic_loci.",datestamp,".",build,".tsv"),sep="\t",row.names=F,quote=F,col.names=T)
-  # system(paste0("cp data/cancer_hereditary_pathogenic_loci.",datestamp,".",build,".tsv data/cancer_hereditary_pathogenic_loci.",build,".tsv"))
-  # system(paste0("cp data/cancer_hereditary_pathogenic_loci.",datestamp,".",build,".bed data/cancer_hereditary_pathogenic_loci.",build,".bed"))
-  # system(paste0("cp data/cancer_hereditary_pathogenic_loci.",datestamp,".",build,".chr.bed data/cancer_hereditary_pathogenic_loci.",build,".chr.bed"))
-  
 }
 
 
@@ -250,11 +239,17 @@ for(build in c('grch37','grch38')){
     dplyr::rename(consequence = Consequence, evidence_id = CIVIC_ID, hgvsp = HGVSp_short,symbol = SYMBOL, chrom = CHROM, pos = POS, ref = REF, alt = ALT) %>%
     dplyr::mutate(genomic_change = paste(chrom,pos,ref,alt,sep="_")) %>%
     dplyr::mutate(hgvsc = stringr::str_match(CDS_CHANGE,"c\\.[0-9]{1}.+:|c\\.[0-9]{1,}(\\+|-)[0-9]{1,}.+")[,1]) %>%
+    dplyr::mutate(codon_pcgr = stringr::str_match(hgvsp,"[0-9]{1,}")[,1]) %>%
     dplyr::mutate(ensembl_transcript_id = stringr::str_match(CDS_CHANGE,"ENST[0-9]{1,}")[,1]) %>%
     dplyr::mutate(hgvsc = stringr::str_replace(hgvsc,":exon[0-9]{1,}:","")) %>%
-    dplyr::select(chrom, pos, ref, alt, symbol, genomic_change, hgvsp, hgvsc, ensembl_transcript_id, consequence, evidence_id) %>%
+    dplyr::select(chrom, pos, ref, alt, symbol, genomic_change, hgvsp, hgvsc, codon_pcgr, ensembl_transcript_id, consequence, evidence_id) %>%
     dplyr::distinct()
   
+  refseq_gencode_trans <- read.table(gzfile(paste0("data-raw/pcgr_onco_xref.",build,".tsv.gz")),header=T,stringsAsFactors = F,quote="",sep="\t",na.strings=c("","NA"),comment.char="#") %>%
+    dplyr::select(ensembl_transcript_id, refseq_mrna) %>%
+    dplyr::filter(!is.na(refseq_mrna))
+  
+  civic_variants <- dplyr::left_join(civic_variants, refseq_gencode_trans)
  
   civic_variants <- dplyr::inner_join(civic_variants, civic_biomarkers)
   
@@ -262,6 +257,11 @@ for(build in c('grch37','grch38')){
   civic_variants <- dplyr::mutate(civic_variants, variant_name_2 = stringr::str_replace(variant_name,"\\*$","X"))
   civic_variants <- dplyr::mutate(civic_variants, variant_name_2 = stringr::str_replace(variant_name_2,"DUP","dup"))
   civic_variants <- dplyr::mutate(civic_variants, variant_name_2 = stringr::str_replace(variant_name_2,"FS","fs"))
+  if(nrow(civic_variants[is.na(civic_variants$codon) & !is.na(civic_variants$codon_pcgr),]) > 0){
+    civic_variants[is.na(civic_variants$codon) & !is.na(civic_variants$codon_pcgr),]$codon <- civic_variants[is.na(civic_variants$codon) & !is.na(civic_variants$codon_pcgr),]$codon_pcgr
+  }
+  civic_variants$codon <- as.integer(civic_variants$codon)
+  
   matching_isoform <- civic_variants[stringr::str_detect(string = civic_variants$variant_name_2, pattern = civic_variants$hgvsp),] %>% dplyr::select(evidence_id,variant_name)
   civic_variants_matching <- dplyr::semi_join(civic_variants,matching_isoform)
   non_matching_isoform <- civic_variants[!stringr::str_detect(string = civic_variants$variant_name_2, pattern = civic_variants$hgvsp),]
@@ -276,6 +276,7 @@ for(build in c('grch37','grch38')){
                                      disease_ontology_id, codon, exon, therapeutic_context, variant_name_2, name) %>%
     dplyr::summarise(hgvsc = paste(unique(hgvsc),collapse=", "), genomic_change = paste(unique(genomic_change),collapse=", "), 
                      ensembl_transcript_id = paste(unique(ensembl_transcript_id), collapse=", "), 
+                     refseq_mrna = paste(unique(refseq_mrna), collapse=", "),
                      start = min(pos) - 6, 
                      end = min(pos) + max(nchar(ref),nchar(alt)) + 4) %>%
       dplyr::arrange(chrom,start,end)
@@ -296,16 +297,6 @@ for(build in c('grch37','grch38')){
   
   all_tracks[['bed']][[build]][['civic']] <- civic_all_bed
   all_tracks[['tsv']][[build]][['civic']] <- cancer_somatic_actionable_loci_tsv
-  
-  # cancer_somatic_actionable_loci_bed_sorted <- sort_bed_regions(civic_all_bed)
-  # 
-  # write.table(cancer_somatic_actionable_loci_bed_sorted,file=paste0("data/cancer_somatic_actionable_loci.",datestamp,".",build,".bed"),sep="\t",row.names=F,quote=F,col.names=F)
-  # cancer_somatic_actionable_loci_bed_sorted$chrom <- paste0('chr',cancer_somatic_actionable_loci_bed_sorted$chrom)
-  # write.table(cancer_somatic_actionable_loci_bed_sorted,file=paste0("data/cancer_somatic_actionable_loci.",datestamp,".",build,".chr.bed"),sep="\t",row.names=F,quote=F,col.names=F)
-  # write.table(cancer_somatic_actionable_loci_tsv,file=paste0("data/cancer_somatic_actionable_loci.",datestamp,".",build,".tsv"),sep="\t",row.names=F,quote=F,col.names=T)
-  # system(paste0("cp data/cancer_somatic_actionable_loci.",datestamp,".",build,".tsv data/cancer_somatic_actionable_loci.",build,".tsv"))
-  # system(paste0("cp data/cancer_somatic_actionable_loci.",datestamp,".",build,".bed data/cancer_somatic_actionable_loci.",build,".bed"))
-  # system(paste0("cp data/cancer_somatic_actionable_loci.",datestamp,".",build,".chr.bed data/cancer_somatic_actionable_loci.",build,".chr.bed"))
   
 }
 
@@ -374,36 +365,6 @@ for(build in c('grch37','grch38')){
     
     all_tracks[['bed']][[build]][['hotspot']] <- cancer_somatic_hotspot_loci_bed_sorted
     all_tracks[['tsv']][[build]][['hotspot']] <- cancer_somatic_hotspot_loci_tsv
-    
-    
-    # 
-    # write.table(cancer_somatic_hotspot_loci_bed_sorted,file=paste0("data/cancer_somatic_hotspot_loci.",datestamp,".",build,".bed"),sep="\t",row.names=F,quote=F,col.names=F)
-    # cancer_somatic_hotspot_loci_bed_sorted$chrom <- paste0('chr',cancer_somatic_hotspot_loci_bed_sorted$chrom)
-    # write.table(cancer_somatic_hotspot_loci_bed_sorted,file=paste0("data/cancer_somatic_hotspot_loci.",datestamp,".",build,".chr.bed"),sep="\t",row.names=F,quote=F,col.names=F)
-    # write.table(cancer_somatic_hotspot_loci_tsv,file=paste0("data/cancer_somatic_hotspot_loci.",datestamp,".",build,".tsv"),sep="\t",row.names=F,quote=F,col.names=T)
-    # system(paste0("cp data/cancer_somatic_hotspot_loci.",datestamp,".",build,".tsv data/cancer_somatic_hotspot_loci.",build,".tsv"))
-    # system(paste0("cp data/cancer_somatic_hotspot_loci.",datestamp,".",build,".bed data/cancer_somatic_hotspot_loci.",build,".bed"))
-    # system(paste0("cp data/cancer_somatic_hotspot_loci.",datestamp,".",build,".chr.bed data/cancer_somatic_hotspot_loci.",build,".chr.bed"))
-    
-    # for(ctype in unique(stringr::str_replace(hotspot_variants$hotspot_cancer_types,":[0-9]{1,}",""))){
-    #   vars <- hotspot_variants[stringr::str_detect(hotspot_variants$hotspot_cancer_types,ctype),] %>%
-    #     dplyr::select(-hotspot_cancer_types) %>%
-    #     dplyr::group_by(chrom, hotspot) %>%
-    #     dplyr::summarise(genomic_change = paste(unique(genomic_change),collapse=","), min_pos = min(pos), max_pos = max(pos) + max(nchar(ref),nchar(alt))) %>%
-    #     dplyr::mutate(name = hotspot) %>%
-    #     dplyr::mutate(start = min_pos - 6, end = max_pos + 5) %>%
-    #     dplyr::select(-c(max_pos,min_pos))
-    #   
-    #   cancer_somatic_hotspot_loci_bed_sorted <- sort_bed_regions(dplyr::select(vars,chrom,start,end,name))
-    #   write.table(cancer_somatic_hotspot_loci_bed_sorted,file=paste0("data/cancer_somatic_hotspot_loci.",ctype,".",datestamp,".",build,".bed"),sep="\t",row.names=F,quote=F,col.names=F)
-    #   cancer_somatic_hotspot_loci_bed_sorted$chrom <- paste0('chr',cancer_somatic_hotspot_loci_bed_sorted$chrom)
-    #   write.table(cancer_somatic_hotspot_loci_bed_sorted,file=paste0("data/cancer_somatic_hotspot_loci.",ctype,".",datestamp,".",build,".chr.bed"),sep="\t",row.names=F,quote=F,col.names=F)
-    #   write.table(cancer_somatic_hotspot_loci_tsv,file=paste0("data/cancer_somatic_hotspot_loci.",ctype,".",datestamp,".",build,".tsv"),sep="\t",row.names=F,quote=F,col.names=T)
-    #   system(paste0("cp data/cancer_somatic_hotspot_loci.",ctype,".",datestamp,".",build,".tsv data/cancer_somatic_hotspot_loci.",ctype,".",build,".tsv"))
-    #   system(paste0("cp data/cancer_somatic_hotspot_loci.",ctype,".",datestamp,".",build,".bed data/cancer_somatic_hotspot_loci.",ctype,".",build,".bed"))
-    #   system(paste0("cp data/cancer_somatic_hotspot_loci.",ctype,".",datestamp,".",build,".chr.bed data/cancer_somatic_hotspot_loci.",ctype,".",build,".chr.bed"))
-    #   cat(ctype,sep='\n')
-    # }
   
 }
 

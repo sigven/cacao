@@ -161,6 +161,8 @@ append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = 
                       ENSEMBL_TRANSCRIPT_ID = ensembl_transcript_id, GENOMIC_CHANGE = genomic_change) %>%
         dplyr::mutate(REGION = paste(paste(CHROM,START,sep=":"),END,sep="-"), COVERAGE = floor(COVERAGE)) %>%
         dplyr::mutate(NAME = stringr::str_replace_all(NAME,"clinvar_path:","")) %>%
+        dplyr::mutate(ENSEMBL_TRANSCRIPT_ID = paste0('<a href=\'http://www.ensembl.org/Homo_sapiens/Transcript/Summary?db=core;t=',ENSEMBL_TRANSCRIPT_ID,'\' target=\'_blank\'>',ENSEMBL_TRANSCRIPT_ID,'</a>')) %>%
+        dplyr::mutate(REFSEQ_TRANSCRIPT_ID = paste0('<a href=\'http://www.ncbi.nlm.nih.gov/nuccore/',REFSEQ_TRANSCRIPT_ID,'\' target=\'_blank\'>',REFSEQ_TRANSCRIPT_ID,'</a>')) %>%
         dplyr::select(-c(CHROM,START,END)) %>%
         dplyr::filter(!is.na(COVERAGE))
     }
@@ -168,7 +170,7 @@ append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = 
 
   if(mode == "somatic_actionable" && !is.null(coverage_df) && !is.null(annotation_df)){
     annotation_df_status <- 'OK'
-    for(var in c('name','symbol','ensembl_transcript_id','hgvsc', 'codon','pubmed_html_link', 'evidence_id','disease_ontology_id',
+    for(var in c('name','symbol','ensembl_transcript_id','refseq_mrna','hgvsc', 'codon','pubmed_html_link', 'evidence_id','disease_ontology_id',
                  'evidence_type','evidence_level','therapeutic_context','clinical_significance','cancer_type','genomic_change')){
       if(!(var %in% colnames(annotation_df))){
         annotation_df_status <- 'MISSING_DATA'
@@ -176,18 +178,21 @@ append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = 
     }
     if(annotation_df_status == 'OK'){
       coverage_df <- as.data.frame(coverage_df %>%
-        dplyr::left_join(dplyr::select(annotation_df, name, symbol, ensembl_transcript_id,pubmed_html_link,disease_ontology_id,clinical_significance,
+          dplyr::left_join(dplyr::select(annotation_df, name, symbol, ensembl_transcript_id, refseq_mrna, pubmed_html_link,disease_ontology_id,clinical_significance,
                                        hgvsc, codon, evidence_level, evidence_id, evidence_type, cancer_type, therapeutic_context, genomic_change),by=c("NAME" = "name")) %>%
-        dplyr::rename(EVIDENCE_LEVEL = evidence_level, EVIDENCE_TYPE = evidence_type, THERAPEUTIC_CONTEXT = therapeutic_context, SYMBOL = symbol,
-                      HGVSc = hgvsc, AMINO_ACID_POSITION = codon, CLINICAL_SIGNIFICANCE = clinical_significance,
+          dplyr::rename(EVIDENCE_LEVEL = evidence_level, EVIDENCE_TYPE = evidence_type, THERAPEUTIC_CONTEXT = therapeutic_context, SYMBOL = symbol,
+                      HGVSc = hgvsc, AMINO_ACID_POSITION = codon, CLINICAL_SIGNIFICANCE = clinical_significance, REFSEQ_TRANSCRIPT_ID = refseq_mrna,
                       CANCERTYPE = cancer_type, ENSEMBL_TRANSCRIPT_ID = ensembl_transcript_id, CITATION = pubmed_html_link, GENOMIC_CHANGE = genomic_change,
                       EVIDENCE_ID = evidence_id) %>%
-        dplyr::mutate(REGION = paste(paste(CHROM,START,sep=":"),END,sep="-"), COVERAGE = floor(COVERAGE)) %>%
-        dplyr::select(-c(CHROM,START,END)) %>%
-        dplyr::filter(!is.na(COVERAGE)) %>%
-        dplyr::mutate(NAME = stringr::str_replace_all(NAME,"civic:EID[0-9]{1,}:","")) %>%
-        dplyr::group_by(NAME, SYMBOL, REGION, ENSEMBL_TRANSCRIPT_ID, AMINO_ACID_POSITION, COVERAGE, TARGET, EVIDENCE_TYPE, EVIDENCE_LEVEL, CANCERTYPE) %>%
-        dplyr::summarise(THERAPEUTIC_CONTEXT = paste(unique(THERAPEUTIC_CONTEXT), collapse=", "),
+          dplyr::mutate(REGION = paste(paste(CHROM,START,sep=":"),END,sep="-"), COVERAGE = floor(COVERAGE)) %>%
+          dplyr::mutate(ENSEMBL_TRANSCRIPT_ID = paste0('<a href=\'http://www.ensembl.org/Homo_sapiens/Transcript/Summary?db=core;t=',ENSEMBL_TRANSCRIPT_ID,'\' target=\'_blank\'>',ENSEMBL_TRANSCRIPT_ID,'</a>')) %>%
+          dplyr::mutate(REFSEQ_TRANSCRIPT_ID = paste0('<a href=\'http://www.ncbi.nlm.nih.gov/nuccore/',REFSEQ_TRANSCRIPT_ID,'\' target=\'_blank\'>',REFSEQ_TRANSCRIPT_ID,'</a>')) %>%
+
+          dplyr::select(-c(CHROM,START,END)) %>%
+          dplyr::filter(!is.na(COVERAGE)) %>%
+          dplyr::mutate(NAME = stringr::str_replace_all(NAME,"civic:EID[0-9]{1,}:","")) %>%
+          dplyr::group_by(NAME, SYMBOL, REGION, ENSEMBL_TRANSCRIPT_ID, REFSEQ_TRANSCRIPT_ID, AMINO_ACID_POSITION, COVERAGE, TARGET, EVIDENCE_TYPE, EVIDENCE_LEVEL, CANCERTYPE) %>%
+          dplyr::summarise(THERAPEUTIC_CONTEXT = paste(unique(THERAPEUTIC_CONTEXT), collapse=", "),
                          CLINICAL_SIGNIFICANCE = paste(unique(CLINICAL_SIGNIFICANCE),collapse=", "),
                          GENOMIC_CHANGE = paste(unique(GENOMIC_CHANGE),collapse=", "),
                          CITATION = paste(unique(CITATION), collapse=", ")))
@@ -366,10 +371,27 @@ plot_global_distribution <- function(global_coverage_distribution, color_callabi
                    legend.text = ggplot2::element_text(family = "Helvetica", size = 12))
 
   p <- p + ggplot2::scale_fill_manual(values = color_callability_map)
-  p
   if(plotly == TRUE){
     p <- plotly::ggplotly(p)
   }
   return(p)
 
+}
+
+#' Function that strips HTML links (keeps the link text) from a data frame
+#' @param coverage_pr_loci data frame with mosdepth-annotated loci (coverage at pathogenic/actionable cancer loci)
+#'
+#' @return coverage_pr_loci
+#'
+
+strip_html_links <- function(coverage_pr_loci){
+  if('ENSEMBL_TRANSCRIPT_ID' %in% colnames(coverage_pr_loci)){
+    coverage_pr_loci$ENSEMBL_TRANSCRIPT_ID <- unlist(lapply(stringr::str_match_all(coverage_pr_loci$ENSEMBL_TRANSCRIPT_ID,">.+<"),paste,collapse=","))
+    coverage_pr_loci$ENSEMBL_TRANSCRIPT_ID <- stringr::str_replace_all(coverage_pr_loci$ENSEMBL_TRANSCRIPT_ID,">|<", "")
+  }
+  if('REFSEQ_TRANSCRIPT_ID' %in% colnames(coverage_pr_loci)){
+    coverage_pr_loci$REFSEQ_TRANSCRIPT_ID <- unlist(lapply(stringr::str_match_all(coverage_pr_loci$REFSEQ_TRANSCRIPT_ID,">.+<"),paste,collapse=","))
+    coverage_pr_loci$REFSEQ_TRANSCRIPT_ID <- stringr::str_replace_all(coverage_pr_loci$REFSEQ_TRANSCRIPT_ID,">|<", "")
+  }
+  return(coverage_pr_loci)
 }
