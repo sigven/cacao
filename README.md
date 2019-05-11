@@ -7,9 +7,9 @@ Technically, *CACAO* combines the speed of [mosdepth](https://github.com/brentp/
 Three clinical genomic tracks in BED format have been created:
 
 * Loci with pathogenic and likely pathogenic variants in protein-coding genes related to cancer predisposition and inherited cancer syndromes (BRCA1, BRCA2, ATM etc.)
-	* Variants have been retrieved from [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar) (November 2018 release)
+	* Variants have been retrieved from [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar) (May 3rd 2019 release)
 * Loci associated with actionable somatic variants (related to prognosis, diagnosis, or drug sensitivity, e.g. BRAF V600E)
-	* Variants have been retrieved from [CIViC](https://civicdb.org) (data obtained November 12th 2018)
+	* Variants have been retrieved from [CIViC](https://civicdb.org) (data obtained May 3rd 2019)
 	* Only variants that we are able to map unambigusously to the genome are included
 * Loci identified as somatic mutational hotspots (i.e. likely driver alterations) in cancer
 	* Variants have been retrieved from [cancerhotspots.org](https://www.cancerhotspots.org) (v2)
