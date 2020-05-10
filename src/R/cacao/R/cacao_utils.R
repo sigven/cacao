@@ -86,21 +86,12 @@ assign_callability <- function(coverage_df, coverage_levels){
   coverage_df$CALLABILITY <- NA
 
   if("COVERAGE" %in% colnames(coverage_df)){
-    if(nrow(coverage_df[coverage_df$TARGET == F,]) > 0){
-      coverage_df[coverage_df$TARGET == F,]$CALLABILITY <- 'NON_TARGET'
-    }
-    if(nrow(coverage_df[coverage_df$COVERAGE == 0 & coverage_df$TARGET == T,]) > 0){
-      coverage_df[coverage_df$COVERAGE == 0 & coverage_df$TARGET == T,]$CALLABILITY <- 'NO_COVERAGE'
-    }
-    if(nrow(coverage_df[coverage_df$COVERAGE > 0 & coverage_df$TARGET == T & coverage_df$COVERAGE < coverage_levels[2],]) > 0){
-      coverage_df[coverage_df$COVERAGE > 0 & coverage_df$TARGET == T & coverage_df$COVERAGE < coverage_levels[2],]$CALLABILITY <- 'LOW_COVERAGE'
-    }
-    if(nrow(coverage_df[coverage_df$COVERAGE >= coverage_levels[2] & coverage_df$COVERAGE < coverage_levels[3] & coverage_df$TARGET == T,]) > 0){
-      coverage_df[coverage_df$COVERAGE >= coverage_levels[2] & coverage_df$COVERAGE < coverage_levels[3] & coverage_df$TARGET == T,]$CALLABILITY <- 'CALLABLE'
-    }
-    if(nrow(coverage_df[coverage_df$COVERAGE >= coverage_levels[3] & coverage_df$TARGET == T,]) > 0){
-      coverage_df[coverage_df$COVERAGE >= coverage_levels[3] & coverage_df$TARGET == T,]$CALLABILITY <- 'HIGH_COVERAGE'
-    }
+    coverage_df <- coverage_df %>%
+      dplyr::mutate(CALLABILITY = dplyr::if_else(TARGET == F,"NON_TARGET",as.character(CALLABILITY))) %>%
+      dplyr::mutate(CALLABILITY = dplyr::if_else(COVERAGE == 0 & TARGET == T,"NO_COVERAGE",as.character(CALLABILITY))) %>%
+      dplyr::mutate(CALLABILITY = dplyr::if_else(COVERAGE > 0 & TARGET == T & COVERAGE < coverage_levels[2],"LOW_COVERAGE",as.character(CALLABILITY))) %>%
+      dplyr::mutate(CALLABILITY = dplyr::if_else(TARGET == T & COVERAGE >= coverage_levels[2] & COVERAGE < coverage_levels[3],"CALLABLE",as.character(CALLABILITY))) %>%
+      dplyr::mutate(CALLABILITY = dplyr::if_else(TARGET == T & COVERAGE >= coverage_levels[3],"HIGH_COVERAGE",as.character(CALLABILITY)))
   }
   return(coverage_df)
 
@@ -119,14 +110,10 @@ read_raw_coverage <- function(bed_coverage_fname){
   }
   else if(ncol(coverage_all_loci) == 6){
     colnames(coverage_all_loci) <- c('CHROM','START','END','NAME','COVERAGE','TARGET_OVERLAP')
-    coverage_all_loci$TARGET <- TRUE
-    if(nrow(coverage_all_loci[coverage_all_loci$TARGET_OVERLAP == 0,]) > 0){
-      coverage_all_loci[coverage_all_loci$TARGET_OVERLAP == 0,]$TARGET <- FALSE
-    }
-    coverage_all_loci <- dplyr::select(coverage_all_loci, -TARGET_OVERLAP)
+    coverage_all_loci <- coverage_all_loci %>%
+      dplyr::mutate(TARGET = dplyr::if_else(TARGET_OVERLAP == 0,FALSE,TRUE)) %>%
+      dplyr::select(-TARGET_OVERLAP)
   }
-
-
 
   coverage_pr_loci <- list()
   coverage_pr_loci[['all']] <- coverage_all_loci
@@ -154,7 +141,7 @@ append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = 
     }
     if(annotation_df_status == 'OK'){
       coverage_df <- coverage_df %>%
-        dplyr::left_join(dplyr::select(annotation_df, name, symbol, class,refseq_mrna, ensembl_transcript_id,
+        dplyr::left_join(dplyr::select(annotation_df, name, symbol, class, refseq_mrna, ensembl_transcript_id,
                                        hgvs_c, codon, pathogenic_loci_trait, pathogenic_loci_trait_link, genomic_change),by = c("NAME" = "name")) %>%
         dplyr::rename(PHENOTYPE = pathogenic_loci_trait, CLINVAR = pathogenic_loci_trait_link, SYMBOL = symbol, LOCUSTYPE = class,
                       HGVSc = hgvs_c, AMINO_ACID_POSITION = codon, REFSEQ_TRANSCRIPT_ID = refseq_mrna,
@@ -170,7 +157,7 @@ append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = 
 
   if(mode == "somatic_actionable" && !is.null(coverage_df) && !is.null(annotation_df)){
     annotation_df_status <- 'OK'
-    for(var in c('name','symbol','ensembl_transcript_id','refseq_mrna','hgvsc', 'codon','pubmed_html_link', 'evidence_id','disease_ontology_id',
+    for(var in c('name','symbol','ensembl_transcript_id','refseq_mrna','hgvsc', 'codon','citation', 'evidence_id','disease_ontology_id',
                  'evidence_type','evidence_level','therapeutic_context','clinical_significance','cancer_type','genomic_change')){
       if(!(var %in% colnames(annotation_df))){
         annotation_df_status <- 'MISSING_DATA'
@@ -178,11 +165,14 @@ append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = 
     }
     if(annotation_df_status == 'OK'){
       coverage_df <- as.data.frame(coverage_df %>%
-          dplyr::left_join(dplyr::select(annotation_df, name, symbol, ensembl_transcript_id, refseq_mrna, pubmed_html_link,disease_ontology_id,clinical_significance,
-                                       hgvsc, codon, evidence_level, evidence_id, evidence_type, cancer_type, therapeutic_context, genomic_change),by=c("NAME" = "name")) %>%
+          dplyr::left_join(dplyr::select(annotation_df, name, symbol, ensembl_transcript_id,
+                                         refseq_mrna, citation, disease_ontology_id,
+                                         clinical_significance, hgvsc, codon, evidence_level,
+                                         evidence_id, evidence_type, cancer_type, therapeutic_context,
+                                         genomic_change), by=c("NAME" = "name")) %>%
           dplyr::rename(EVIDENCE_LEVEL = evidence_level, EVIDENCE_TYPE = evidence_type, THERAPEUTIC_CONTEXT = therapeutic_context, SYMBOL = symbol,
                       HGVSc = hgvsc, AMINO_ACID_POSITION = codon, CLINICAL_SIGNIFICANCE = clinical_significance, REFSEQ_TRANSCRIPT_ID = refseq_mrna,
-                      CANCERTYPE = cancer_type, ENSEMBL_TRANSCRIPT_ID = ensembl_transcript_id, CITATION = pubmed_html_link, GENOMIC_CHANGE = genomic_change,
+                      CANCERTYPE = cancer_type, ENSEMBL_TRANSCRIPT_ID = ensembl_transcript_id, CITATION = citation, GENOMIC_CHANGE = genomic_change,
                       EVIDENCE_ID = evidence_id) %>%
           dplyr::mutate(REGION = paste(paste(CHROM,START,sep=":"),END,sep="-"), COVERAGE = floor(COVERAGE)) %>%
           dplyr::mutate(ENSEMBL_TRANSCRIPT_ID = paste0('<a href=\'http://www.ensembl.org/Homo_sapiens/Transcript/Summary?db=core;t=',ENSEMBL_TRANSCRIPT_ID,'\' target=\'_blank\'>',ENSEMBL_TRANSCRIPT_ID,'</a>')) %>%

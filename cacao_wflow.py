@@ -9,7 +9,7 @@ import logging
 import sys
 import toml
 
-cacao_version = '0.2.1'
+cacao_version = '0.3.0'
 
 
 def __main__():
@@ -20,6 +20,7 @@ def __main__():
    parser.add_argument('--callability_levels_germline', dest="callability_levels_germline",default="0:10:100", help="Simple colon-separated string that defines four levels of variant callability: NO_COVERAGE (0), LOW_COVERAGE (1-9), CALLABLE (10-99), HIGH_COVERAGE (>= 100). Initial value must be 0.")
    parser.add_argument('--callability_levels_somatic', dest="callability_levels_somatic",default="0:30:200", help="Simple colon-separated string that defines four levels of variant callability: NO_COVERAGE (0), LOW_COVERAGE (1-29), CALLABLE (30-199), HIGH_COVERAGE (>= 200). Initial value must be 0.")
    parser.add_argument('--query_target', dest = "query_target", help="BED file with genome target regions subject to sequencing")
+   parser.add_argument('--rnaseq_alignment',action = "store_true",help='By default, CACAO assumes a BAM file coming from DNA sequencing. Indicate whether the alignment is from RNA-seq with this flag')
    parser.add_argument('--force_overwrite', action = "store_true", help='By default, the script will fail with an error if any output file already exists. You can force the overwrite of existing result files by using this flag')
    #parser.add_argument('--no-docker', action='store_true', dest='no_docker', default=False, help='Run the cacao workflow in a non-Docker mode (see install_no_docker/ folder for instructions')
    parser.add_argument('--version', action='version', version='%(prog)s ' + str(cacao_version))
@@ -49,11 +50,18 @@ def __main__():
       input_aln_index_host = os.path.join(host_directories['input_alndir'], host_directories['input_aln_index_basename']) 
 
    logger.info('Running cacao workflow - assessment of coverage at actionable and pathogenic loci')
-   docker_command = 'docker run --rm -ti -w=/workdir/output -v=' + str(host_directories['track_dir']) + ':/workdir/tracks -v=' + str(host_directories['output_dir']) + ':/workdir/output -v=' + str(input_aln_host) + ':/workdir/query.bam -v=' + str(input_aln_index_host) + ':/workdir/query.bam.bai ' + str(docker_image_version)
+   docker_command = 'docker run --rm -ti -w=/workdir/output -v=' + str(host_directories['track_dir']) + ':/workdir/tracks -v=' + \
+      str(host_directories['output_dir']) + ':/workdir/output -v=' + str(input_aln_host) + ':/workdir/query.bam -v=' + \
+      str(input_aln_index_host) + ':/workdir/query.bam.bai ' + str(docker_image_version)
    if host_directories['input_target_dir'] != "NA" and host_directories['input_target_basename'] != "NA":
       input_target_host = os.path.join(host_directories['input_target_dir'], host_directories['input_target_basename'])
-      docker_command = 'docker run --rm -ti -w=/workdir/output -v=' + str(host_directories['track_dir']) + ':/workdir/tracks -v=' + str(host_directories['output_dir']) + ':/workdir/output -v=' + str(input_aln_host) + ':/workdir/query.bam -v=' + str(input_aln_index_host) + ':/workdir/query.bam.bai -v' + str(input_target_host) + ':/workdir/query_target.bed ' + str(docker_image_version)
-   cacao_command = '/cacao.py /workdir/query.bam /workdir/query_target.bed ' + str(host_directories['input_aln_basename']) + ' ' + str(host_directories['input_target_basename']) + ' /workdir/tracks /workdir/output ' + str(args.genome_assembly) + ' ' + str(args.mode) + ' ' + str(args.sample_id) + ' ' + str(args.mapq) + ' ' + str(args.threads) + ' ' + str(args.callability_levels_germline) + ' ' + str(args.callability_levels_somatic)
+      docker_command = 'docker run --rm -ti -w=/workdir/output -v=' + str(host_directories['track_dir']) + ':/workdir/tracks -v=' + \
+         str(host_directories['output_dir']) + ':/workdir/output -v=' + str(input_aln_host) + ':/workdir/query.bam -v=' + \
+         str(input_aln_index_host) + ':/workdir/query.bam.bai -v' + str(input_target_host) + ':/workdir/query_target.bed ' + str(docker_image_version)
+   cacao_command = '/cacao.py /workdir/query.bam /workdir/query_target.bed ' + str(host_directories['input_aln_basename']) + ' ' + \
+      str(host_directories['input_target_basename']) + ' /workdir/tracks /workdir/output ' + str(args.genome_assembly) + ' ' + \
+      str(args.mode) + ' ' + str(args.sample_id) + ' ' + str(args.mapq) + ' ' + str(args.threads) + ' ' + \
+      str(args.callability_levels_germline) + ' ' + str(args.callability_levels_somatic)
    run_cacao_cmd = str(docker_command) + ' sh -c "' + str(cacao_command) + '"'
    check_subprocess(run_cacao_cmd)
 
@@ -98,7 +106,7 @@ def verify_arguments(query_alignment_fname, query_target_fname, track_directory,
    # check the existence of track folder
    track_dir_full = os.path.abspath(track_directory)
    if not os.path.isdir(track_dir_full):
-      err_msg = "Track directory (" + str(track_dir_full) + ") does not exist"
+      err_msg = "Track directory with actionable/pathogenic loci (" + str(track_dir_full) + ") does not exist"
       error_message(err_msg,logger)
    
    # check if target file (BED) exists
@@ -123,7 +131,7 @@ def verify_arguments(query_alignment_fname, query_target_fname, track_directory,
       error_message(err_msg,logger)
 
    bam = 0 
-   ## check if input VCF exists
+   ## check if input BAM/CRAM exists
    if not query_alignment_fname is None:
 
       if not query_alignment_fname.endswith('.bam') and not query_alignment_fname.endswith('.cram'):

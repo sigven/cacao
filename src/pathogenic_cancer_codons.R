@@ -1,8 +1,11 @@
 
 library(magrittr)
-medgen_map <- readRDS(file="data-raw/medgen_map.rds")
+medgen_map <- readRDS(file="data-raw/concept_summary_data.rds") %>%
+  dplyr::filter(main_term == T) %>%
+  dplyr::select(cui,cui_name) %>%
+  dplyr::distinct()
 
-datestamp <- '20181129'
+datestamp <- '20200510'
 
 all_tracks <- list()
 for(ttype in c('bed','tsv')){
@@ -12,6 +15,7 @@ for(ttype in c('bed','tsv')){
     all_tracks[[ttype]][[b]][['clinvar_path']] <- data.frame()
     all_tracks[[ttype]][[b]][['civic']] <- data.frame()
     all_tracks[[ttype]][[b]][['hotspot']] <- data.frame()
+    all_tracks[[ttype]][[b]][['driver']] <- data.frame()
   }
 }
 
@@ -40,102 +44,185 @@ sort_bed_regions <- function(unsorted_regions){
 
 ## Hereditary cancer
 
+clinvar_url <- "https://www.ncbi.nlm.nih.gov/clinvar/variation/"
+
 for(build in c('grch37','grch38')){
-  gencode_xref <- read.table(gzfile(paste0("data-raw/pcgr_onco_xref.",build,".tsv.gz")),header=T,stringsAsFactors = F,quote="",sep="\t",na.strings=c("","NA"),comment.char="#")
-  gencode_xref <- dplyr::select(gencode_xref, -c(refseq_mrna, strand,transcript_start,transcript_end)) %>% dplyr::distinct()
-  gencode_xref <- dplyr::filter(gencode_xref, !is.na(chrom) & !is.na(start) & !is.na(end))
-  gencode_xref <- dplyr::rename(gencode_xref, transcript_start = start, transcript_end = end, biotype = gencode_transcript_type)
-  gencode_xref <- dplyr::filter(gencode_xref, !stringr::str_detect(chrom,"^GL"))
+  hgname <- 'hg38'
+  if(build == 'grch37'){
+    hgname <- 'hg19'
+  }
+  gencode_xref <- read.table(gzfile(paste0("data-raw/pcgr_onco_xref.",build,".tsv.gz")),header=T,
+                             stringsAsFactors = F,quote="",sep="\t",na.strings=c("","NA"),comment.char="#") %>%
+    dplyr::select(-c(refseq_mrna, strand,transcript_start,transcript_end)) %>% 
+    dplyr::distinct() %>%
+    dplyr::filter(!is.na(chrom) & !is.na(start) & !is.na(end)) %>%
+    dplyr::rename(transcript_start = start, transcript_end = end, biotype = gencode_transcript_type) %>%
+    dplyr::filter(!stringr::str_detect(chrom,"^GL"))
   
-  refseq_gencode_trans <- read.table(gzfile(paste0("data-raw/pcgr_onco_xref.",build,".tsv.gz")),header=T,stringsAsFactors = F,quote="",sep="\t",na.strings=c("","NA"),comment.char="#") %>%
+  refseq_gencode_trans <- read.table(gzfile(paste0("data-raw/pcgr_onco_xref.",build,".tsv.gz")),header=T,
+                                     stringsAsFactors = F,quote="",sep="\t",na.strings=c("","NA"),comment.char="#") %>%
     dplyr::select(ensembl_transcript_id, refseq_mrna) %>%
     dplyr::filter(!is.na(refseq_mrna))
   
-  cancer_predisposition <- gencode_xref %>% 
-    dplyr::select(ensembl_gene_id, symbol, entrezgene, predisp_source, predisp_cancer_cui, predisp_syndrome_cui, predisp_cancer_moi) %>%
-    dplyr::filter(!is.na(predisp_source)) %>%
+  cancer_predisposition_genes <- gencode_xref %>% 
+    dplyr::select(ensembl_gene_id, symbol, entrezgene, ge_panel, predisp_source, 
+                  predisp_cancer_cui, predisp_syndrome_cui, predisp_cancer_moi) %>%
+    dplyr::filter(!is.na(predisp_source) | !is.na(ge_panel)) %>%
     dplyr::distinct()
 
-  clinvar <- read.table(gzfile(paste0("data-raw/clinvar.",build,".tsv.gz")), header=T, stringsAsFactors = F, quote="", sep="\t",na.strings=c("","-",NA),comment.char="")
-  clinvar$var_id <- paste(paste0('chr',clinvar$chrom),clinvar$pos,clinvar$ref,clinvar$alt,sep="_")
-  clinvar <- dplyr::left_join(clinvar, refseq_gencode_trans)
+  clinvar <- read.table(gzfile(paste0("data-raw/clinvar.",build,".tsv.gz")), header=T, 
+                        stringsAsFactors = F, quote="", sep="\t",na.strings=c("","-",NA),comment.char="") %>%
+    dplyr::mutate(var_id = paste(paste0('chr',chrom),pos,ref,alt,sep="_")) %>%
+    dplyr::left_join(refseq_gencode_trans)
   
   ## PATHOGENIC PROTEIN LOCI IN CANCER PREDISPOSITION GENES
-  clinvar_pathogenic_cpg <- dplyr::semi_join(dplyr::filter(clinvar, (origin == 'germline' | origin == 'germline,somatic') & pathogenic == 1),cancer_predisposition, by=c("symbol"))
+  clinvar_pathogenic_cpg <- dplyr::semi_join(dplyr::filter(clinvar, (origin == 'germline' | origin == 'germline,somatic') & pathogenic == 1),
+                                             cancer_predisposition_genes, by=c("symbol")) %>%
+    dplyr::mutate(variation_id = as.character(variation_id)) %>%
+    tidyr::separate_rows(molecular_consequence_all,sep=";") %>%
+    dplyr::filter(stringr::str_detect(molecular_consequence_all,refseq_mrna))
+
+  tmp <- clinvar_pathogenic_cpg %>%
+    dplyr::group_by(variation_id) %>%
+    dplyr::summarise(n = dplyr::n()) %>%
+    dplyr::filter(n > 1)
   
+  clinvar_pathogenic_cpg <- clinvar_pathogenic_cpg %>%
+    dplyr::left_join(tmp) %>%
+    dplyr::filter(is.na(n) | n == 2 & stringr::str_detect(molecular_consequence_all,"splice"))
   
   cpg_pathogenic_insertions <- as.data.frame(
       clinvar_pathogenic_cpg %>%
-      dplyr::select(symbol, chrom,pos, ref, alt, refseq_mrna, variation_type, molecular_consequence, ensembl_transcript_id, hgvs_p, hgvs_c, variation_id, cui) %>%
-      dplyr::filter(variation_type == 'Duplication' | variation_type == 'Insertion') %>%
-      dplyr::filter(!stringr::str_detect(molecular_consequence,"splice_")) %>%
+      dplyr::select(symbol, chrom,pos, ref, alt, refseq_mrna, variation_type, 
+                    molecular_consequence, ensembl_transcript_id, hgvs_p, hgvs_c, variation_id, cui) %>%
+      dplyr::filter(variation_type == 'Duplication' | variation_type == 'Insertion' | (variation_type == 'Indel' & !is.na(molecular_consequence))) %>%
+      dplyr::filter(!stringr::str_detect(molecular_consequence,"^(SO:0001574|SO:0001575)")) %>%
       dplyr::filter(!is.na(hgvs_p)) %>%
+      dplyr::filter(!stringr::str_detect(molecular_consequence,"^SO:0001627\\|intron_variant$")) %>%
       dplyr::mutate(codon = stringr::str_replace_all(hgvs_p,"\\*$|fs\\*[0-9]{1,}$","")) %>%
       dplyr::mutate(codon = stringr::str_replace_all(codon,"[A-Z]{1,}|[a-z]{1,}|\\.","")) %>%
-      dplyr::mutate(name = paste0("clinvar_path:",symbol,":",stringr::str_replace(hgvs_p,"[A-Z]fs$",""))) %>%
+      dplyr::mutate(name = paste0("clinvar_path:",symbol,":",stringr::str_replace(hgvs_p,"([A-Z]|[A-Z]fs|del|delins[A-Z]{1,})$",""))) %>%
       dplyr::mutate(genomic_change = paste(chrom,pos,ref,alt,sep="_")) %>%
       tidyr::separate_rows(cui) %>%
       dplyr::left_join(medgen_map) %>%
-      dplyr::group_by(symbol,hgvs_c,hgvs_p,codon,alt,name,chrom,pos,variation_id,genomic_change,refseq_mrna, ensembl_transcript_id) %>%
+      dplyr::group_by(symbol,hgvs_c,hgvs_p,codon,alt,name,chrom,pos,variation_id,
+                      variation_type, molecular_consequence, genomic_change,refseq_mrna, ensembl_transcript_id) %>%
       dplyr::summarise(trait = paste(unique(cui_name),collapse=";")) %>%
-      dplyr::mutate(link = paste0("<a href='https://www.ncbi.nlm.nih.gov/clinvar/variation/",variation_id,"' target='_blank'>",symbol,"|",hgvs_c,"|",hgvs_p," - ",trait,"</a>")) %>%
+      dplyr::ungroup() %>%
+      dplyr::mutate(link = paste0("<a href='",clinvar_url,variation_id,"' target='_blank'>",symbol,"|",hgvs_c,"|",hgvs_p," - ",trait,"</a>")) %>%
       dplyr::group_by(symbol,chrom,codon,refseq_mrna,ensembl_transcript_id,name) %>%
-      dplyr::summarise(pathogenic_loci_trait_link = paste(link, collapse=", "), pathogenic_loci_trait = paste0(unique(trait),collapse=";"), variation_id = paste(variation_id, collapse=","), genomic_change = paste(unique(genomic_change),collapse=","), hgvs_c = paste(unique(hgvs_c), collapse=","), hgvs_p = paste(unique(hgvs_p), collapse=","), max_length_alt = max(nchar(alt)), min_pos = min(pos), max_pos = max(pos)) %>%
-      dplyr::mutate(start = as.integer(min_pos) - 6, end = max_pos + nchar(max_length_alt) + 4) %>%
-      dplyr::select(-c(max_pos,max_length_alt,min_pos)))
+      dplyr::summarise(pathogenic_loci_trait_link = paste(link, collapse=", "), 
+                       pathogenic_loci_trait = paste0(unique(trait),collapse=";"), 
+                       variation_id = paste(variation_id, collapse=","), 
+                       genomic_change = paste(unique(genomic_change),collapse=","), 
+                       hgvs_c = paste(unique(hgvs_c), collapse=","), 
+                       hgvs_p = paste(unique(hgvs_p), collapse=","),
+                       molecular_consequence = paste(unique(molecular_consequence),collapse=","),
+                       max_length_alt = max(nchar(alt)), 
+                       min_pos = min(pos), 
+                       max_pos = max(pos)) %>%
+      dplyr::mutate(start = as.integer(min_pos) - 6, end = as.integer(max_pos + nchar(max_length_alt) + 4)) %>%
+      dplyr::select(-c(max_pos,max_length_alt,min_pos)) %>%
+      dplyr::mutate(class = dplyr::if_else(stringr::str_detect(molecular_consequence,"^((SO:0001583\\|missense)|(SO:0001587\\|nonsense)|(SO:0001819\\|synonymous))"),
+                                           "Codon",
+                                           "Frameshift insertion"
+      ))
+  )
   
   cpg_pathogenic_deletions <- as.data.frame(
     clinvar_pathogenic_cpg %>%
-      dplyr::select(symbol, chrom,pos, ref, alt, refseq_mrna, variation_type, molecular_consequence, ensembl_transcript_id, hgvs_p, hgvs_c, variation_id, cui) %>%
+      dplyr::select(symbol, chrom,pos, ref, alt, refseq_mrna, variation_type, 
+                    molecular_consequence, ensembl_transcript_id, hgvs_p, hgvs_c, variation_id, cui) %>%
       dplyr::filter(variation_type == 'Deletion') %>%
-      dplyr::filter(!stringr::str_detect(molecular_consequence,"splice_")) %>%
+      dplyr::filter(!stringr::str_detect(molecular_consequence,"^(SO:0001574|SO:0001575)")) %>%
       dplyr::filter(!is.na(hgvs_p)) %>%
+      dplyr::filter(!stringr::str_detect(molecular_consequence,"^SO:0001627\\|intron_variant$")) %>%
       dplyr::mutate(codon = stringr::str_replace_all(hgvs_p,"\\*$|fs\\*[0-9]{1,}$","")) %>%
       dplyr::mutate(codon = stringr::str_replace_all(codon,"[A-Z]{1,}|[a-z]{1,}|\\.","")) %>%
-      dplyr::mutate(name = paste0("clinvar_path:",symbol,":",stringr::str_replace(hgvs_p,"[A-Z]fs$",""))) %>%
+      dplyr::mutate(name = paste0("clinvar_path:",symbol,":",stringr::str_replace(hgvs_p,"([A-Z]|[A-Z]fs|del|delins[A-Z]{1,})$",""))) %>%
       dplyr::mutate(genomic_change = paste(chrom,pos,ref,alt,sep="_")) %>%
       tidyr::separate_rows(cui) %>%
       dplyr::left_join(medgen_map) %>%
-      dplyr::group_by(symbol,hgvs_c,hgvs_p,codon,ref,name,chrom,pos,variation_id,genomic_change,refseq_mrna, ensembl_transcript_id) %>%
+      dplyr::group_by(symbol,hgvs_c,hgvs_p,codon,ref,name,chrom,pos,variation_id,
+                      variation_type, molecular_consequence, genomic_change,refseq_mrna, ensembl_transcript_id) %>%
       dplyr::summarise(trait = paste(unique(cui_name),collapse=";")) %>%
-      dplyr::mutate(link = paste0("<a href='https://www.ncbi.nlm.nih.gov/clinvar/variation/",variation_id,"' target='_blank'>",symbol,"|",hgvs_c,"|",hgvs_p," - ",trait,"</a>")) %>%
+      dplyr::mutate(link = paste0("<a href='",clinvar_url,variation_id,"' target='_blank'>",symbol,"|",hgvs_c,"|",hgvs_p," - ",trait,"</a>")) %>%
       dplyr::group_by(symbol,chrom,codon,refseq_mrna,ensembl_transcript_id,name) %>%
-      dplyr::summarise(pathogenic_loci_trait_link = paste(link, collapse=", "), pathogenic_loci_trait = paste0(unique(trait),collapse=";"), variation_id = paste(variation_id, collapse=","), genomic_change = paste(unique(genomic_change),collapse=", "), hgvs_c = paste(unique(hgvs_c), collapse=", "), hgvs_p = paste(unique(hgvs_p), collapse=", "), max_length_ref = max(nchar(ref)), min_pos = min(pos), max_pos = max(pos)) %>%
+      dplyr::summarise(pathogenic_loci_trait_link = paste(link, collapse=", "), 
+                       pathogenic_loci_trait = paste0(unique(trait),collapse=";"), 
+                       variation_id = paste(variation_id, collapse=","), 
+                       genomic_change = paste(unique(genomic_change),collapse=", "), 
+                       hgvs_c = paste(unique(hgvs_c), collapse=", "), 
+                       hgvs_p = paste(unique(hgvs_p), collapse=", "),
+                       molecular_consequence = paste(unique(molecular_consequence),collapse=","),
+                       max_length_ref = max(nchar(ref)), 
+                       min_pos = min(pos), 
+                       max_pos = max(pos)) %>%
       dplyr::mutate(start = as.integer(min_pos) - 6, end = max_pos + max_length_ref + 4) %>%
-      dplyr::select(-c(max_pos,max_length_ref,min_pos)))
+      dplyr::select(-c(max_pos,max_length_ref,min_pos)) %>%
+      dplyr::mutate(class = "Frameshift deletion")
+    )
   
-  clinvar_pathogenic_cpg$variation_id <- as.character(clinvar_pathogenic_cpg$variation_id)
+  cpg_pathogenic_insertions_varid <- cpg_pathogenic_insertions %>% 
+    dplyr::select(variation_id) %>% 
+    tidyr::separate_rows(variation_id)
   
-  cpg_pathogenic_insertions_varid <- cpg_pathogenic_insertions %>% dplyr::select(variation_id) %>% tidyr::separate_rows(variation_id)
-  cpg_pathogenic_deletions_varid <- cpg_pathogenic_deletions %>% dplyr::select(variation_id) %>% tidyr::separate_rows(variation_id)
-  clinvar_pathogenic_cpg <- dplyr::anti_join(clinvar_pathogenic_cpg,dplyr::bind_rows(cpg_pathogenic_insertions_varid,cpg_pathogenic_deletions_varid))
+  cpg_pathogenic_deletions_varid <- cpg_pathogenic_deletions %>% 
+    dplyr::select(variation_id) %>% 
+    tidyr::separate_rows(variation_id)
+  
+  clinvar_pathogenic_cpg <- clinvar_pathogenic_cpg %>% 
+    dplyr::anti_join(dplyr::bind_rows(cpg_pathogenic_insertions_varid,cpg_pathogenic_deletions_varid)) %>%
+    dplyr::filter(!is.na(molecular_consequence))
   
   cpg_pathogenic_splicesites <- as.data.frame(
     clinvar_pathogenic_cpg %>%
-      dplyr::select(symbol, chrom,pos, ref,alt, refseq_mrna, ref,molecular_consequence, ensembl_transcript_id, hgvs_p, hgvs_c, variation_id, cui) %>%
+      dplyr::select(symbol, chrom,pos, ref,alt, refseq_mrna, ref,molecular_consequence, 
+                    ensembl_transcript_id, hgvs_p, hgvs_c, variation_id, cui) %>%
       dplyr::filter(is.na(hgvs_p)) %>%
-      dplyr::filter(stringr::str_detect(molecular_consequence,"splice_")) %>%
+      dplyr::filter(stringr::str_detect(molecular_consequence,"^(SO:0001574|SO:0001575)") | stringr::str_detect(hgvs_c,"c\\.[0-9]{1,}(\\+|-)[0-9]{1}")) %>%
       dplyr::mutate(coding_nucleotide_number = stringr::str_match(hgvs_c,"c\\.[0-9]{1,}(\\+|-)[0-9]{1,}(del|ins|dup|A|G|C|T)")[,1]) %>%
-      dplyr::mutate(genomic_change = paste(chrom,pos,ref,alt,sep="_")))
-  
-    cpg_pathogenic_splicesites[is.na(cpg_pathogenic_splicesites$coding_nucleotide_number),]$coding_nucleotide_number <- cpg_pathogenic_splicesites[is.na(cpg_pathogenic_splicesites$coding_nucleotide_number),]$hgvs_c
+      dplyr::mutate(genomic_change = paste(chrom,pos,ref,alt,sep="_")) %>%
+      dplyr::mutate(coding_nucleotide_number = dplyr::if_else(is.na(coding_nucleotide_number),
+                                                              hgvs_c,
+                                                              as.character(coding_nucleotide_number)))
+    )
     
     cpg_pathogenic_splicesites <- as.data.frame(
       cpg_pathogenic_splicesites %>%
         tidyr::separate_rows(cui) %>%
         dplyr::left_join(medgen_map) %>%
-        dplyr::group_by(chrom,pos,ref,symbol,hgvs_c,coding_nucleotide_number,variation_id,refseq_mrna, ensembl_transcript_id) %>%
-        dplyr::summarise(trait = paste(unique(cui_name),collapse=";"), genomic_change = paste(unique(genomic_change),collapse=";")) %>%
-        dplyr::mutate(link = paste0("<a href='https://www.ncbi.nlm.nih.gov/clinvar/variation/",variation_id,"' target='_blank'>",symbol,"|",hgvs_c," - ",trait,"</a>")) %>%
+        dplyr::group_by(chrom,pos,ref,symbol,hgvs_c,coding_nucleotide_number,variation_id,
+                        molecular_consequence, refseq_mrna, ensembl_transcript_id) %>%
+        dplyr::summarise(trait = paste(unique(cui_name),collapse=";"), 
+                         genomic_change = paste(unique(genomic_change),collapse=";")) %>%
+        dplyr::mutate(link = paste0("<a href='",clinvar_url,variation_id,"' target='_blank'>",symbol,"|",hgvs_c," - ",trait,"</a>")) %>%
         dplyr::group_by(symbol,chrom,coding_nucleotide_number,refseq_mrna,ensembl_transcript_id) %>%
-        dplyr::summarise(pathogenic_loci_trait_link = paste0(link, collapse=", "), pathogenic_loci_trait = paste0(unique(trait),collapse=";"), variation_id = paste(variation_id, collapse=","), genomic_change = paste(unique(genomic_change),collapse=", "), hgvs_c = paste(unique(hgvs_c), collapse=", "), max_length_ref = max(nchar(ref)), min_pos = min(pos), max_pos = max(pos)) %>%
-        dplyr::mutate(name = paste0("clinvar_path:",symbol,":",coding_nucleotide_number), start = as.integer(min_pos) - 6, end = as.integer(max_pos) + max_length_ref + 4) %>%
-        dplyr::select(-c(max_pos,max_length_ref,min_pos)))
+        dplyr::summarise(pathogenic_loci_trait_link = paste0(link, collapse=", "), 
+                         pathogenic_loci_trait = paste0(unique(trait),collapse=";"), 
+                         variation_id = paste(variation_id, collapse=","), 
+                         genomic_change = paste(unique(genomic_change),collapse=", "), 
+                         hgvs_c = paste(unique(hgvs_c), collapse=", "), 
+                         molecular_consequence = paste(unique(molecular_consequence),collapse=","),
+                         max_length_ref = max(nchar(ref)), 
+                         min_pos = min(pos), 
+                         max_pos = max(pos)) %>%
+        dplyr::mutate(name = paste0("clinvar_path:",symbol,":",coding_nucleotide_number), 
+                      start = as.integer(min_pos) - 6, end = as.integer(max_pos) + max_length_ref + 4) %>%
+        dplyr::select(-c(max_pos,max_length_ref,min_pos)) %>%
+        dplyr::mutate(class = "Splice site")
+      )
   
-  cpg_pathogenic_splicesites_varid <- cpg_pathogenic_splicesites %>% dplyr::select(variation_id) %>% tidyr::separate_rows(variation_id)
+  cpg_pathogenic_splicesites_varid <- cpg_pathogenic_splicesites %>% 
+    dplyr::select(variation_id) %>% 
+    tidyr::separate_rows(variation_id)
   clinvar_pathogenic_cpg <- dplyr::anti_join(clinvar_pathogenic_cpg,cpg_pathogenic_splicesites_varid)
   
-  cpg_pathogenic_protein <- as.data.frame(dplyr::select(clinvar_pathogenic_cpg, chrom, pos, ref,alt,symbol, refseq_mrna, molecular_consequence, ensembl_transcript_id, hgvs_c, hgvs_p, variation_id, cui) %>%
+  cpg_pathogenic_protein <- as.data.frame(
+    clinvar_pathogenic_cpg %>% 
+      dplyr::select(chrom, pos, ref,alt,symbol, refseq_mrna, 
+                    molecular_consequence, ensembl_transcript_id, 
+                    hgvs_c, hgvs_p, variation_id, cui) %>%
     dplyr::filter(!is.na(hgvs_p)) %>%
     tidyr::separate_rows(cui) %>%
     dplyr::filter(stringr::str_detect(molecular_consequence, "nonsense|missense|synonymous|frameshift")) %>%
@@ -144,13 +231,25 @@ for(build in c('grch37','grch38')){
     dplyr::mutate(codon = stringr::str_replace_all(codon,"[A-Z]{1,}|[a-z]{1,}|\\.","")) %>%
     dplyr::mutate(genomic_change = paste(chrom,pos,ref,alt,sep="_")) %>%
     dplyr::mutate(hgvs_p = stringr::str_replace_all(hgvs_p,"\\*$","X")) %>%
-    dplyr::mutate(name = paste0("clinvar_path:",symbol,":",stringr::str_replace(hgvs_p,"[A-Z]$|delins[A-Z]{1,}$|del[A-Z]{1,}$|[A-Z]{1,}fs(\\*[0-9]{1,}){0,}$",""))) %>%
+    dplyr::mutate(name = paste0("clinvar_path:",symbol,":",
+                                stringr::str_replace(hgvs_p,"[A-Z]$|delins[A-Z]{1,}$|del[A-Z]{1,}$|[A-Z]{1,}fs(\\*[0-9]{1,}){0,}$",""))) %>%
     dplyr::distinct() %>%
-    dplyr::group_by(chrom,pos,genomic_change,name,symbol,hgvs_p,hgvs_c,variation_id,refseq_mrna, ensembl_transcript_id,codon) %>%
+    dplyr::group_by(chrom,pos,genomic_change,name,symbol,hgvs_p,hgvs_c,variation_id,refseq_mrna, 
+                    molecular_consequence, ensembl_transcript_id,codon) %>%
     dplyr::summarise(trait = paste(unique(cui_name),collapse=";")) %>%
-    dplyr::mutate(link = paste0("<a href='https://www.ncbi.nlm.nih.gov/clinvar/variation/",variation_id,"' target='_blank'>",symbol,"|",hgvs_c,"|",hgvs_p," - ",trait,"</a>")) %>%
+    dplyr::mutate(link = paste0("<a href='",clinvar_url,variation_id,"' target='_blank'>",symbol,"|",hgvs_c,"|",hgvs_p," - ",trait,"</a>")) %>%
     dplyr::group_by(chrom,symbol,codon,refseq_mrna,ensembl_transcript_id,name) %>%
-    dplyr::summarise(pathogenic_loci_trait_link = paste0(link, collapse=", "), pathogenic_loci_trait = paste0(unique(trait),collapse=";"), min_pos = min(pos), max_pos = max(pos), variation_id = paste(unique(variation_id), collapse=","),genomic_change = paste(unique(genomic_change),collapse=", "), hgvs_c = paste(unique(hgvs_c), collapse=", "), hgvs_p = paste(unique(hgvs_p), collapse=", "))) 
+    dplyr::summarise(pathogenic_loci_trait_link = paste0(link, collapse=", "), 
+                     pathogenic_loci_trait = paste0(unique(trait),collapse=";"), 
+                     min_pos = min(pos), 
+                     max_pos = max(pos), 
+                     molecular_consequence = paste(unique(molecular_consequence),collapse=", "),
+                     variation_id = paste(unique(variation_id), collapse=","),
+                     genomic_change = paste(unique(genomic_change),collapse=", "), 
+                     hgvs_c = paste(unique(hgvs_c), collapse=", "), 
+                     hgvs_p = paste(unique(hgvs_p), collapse=", ")) %>%
+      dplyr::mutate(class = "Codon")
+    ) 
   
   cpg_pathogenic_protein_single_exon <- cpg_pathogenic_protein %>%
     dplyr::filter(max_pos - min_pos < 50) %>%
@@ -174,15 +273,12 @@ for(build in c('grch37','grch38')){
     i <- i + 1
     
   }
-  
   cpg_pathogenic_protein_regions <- dplyr::bind_rows(cpg_pathogenic_protein_single_exon, all_spanning_entries)
-  cpg_pathogenic_deletions$class <- 'Frameshift deletion'
-  cpg_pathogenic_insertions$class <- 'Frameshift insertion'
-  cpg_pathogenic_splicesites$class <- 'Splice site'
-  cpg_pathogenic_protein_regions$class <- 'Codon'
   
-  cpg_pathogenic_tsv <- dplyr::bind_rows(cpg_pathogenic_protein_regions,cpg_pathogenic_splicesites,cpg_pathogenic_deletions,cpg_pathogenic_insertions) %>%
-    dplyr::select(chrom,start,end,symbol,name,class,variation_id,hgvs_c,hgvs_p,refseq_mrna,ensembl_transcript_id,dplyr::everything())
+  cpg_pathogenic_tsv <- dplyr::bind_rows(cpg_pathogenic_protein_regions,cpg_pathogenic_splicesites,
+                                         cpg_pathogenic_deletions,cpg_pathogenic_insertions) %>%
+    dplyr::select(chrom,start,end,symbol,name,class,variation_id,
+                  hgvs_c,hgvs_p,refseq_mrna,ensembl_transcript_id,dplyr::everything())
   
   cpg_pathogenic_tsv$cacao_id <- seq(1:nrow(cpg_pathogenic_tsv))
   
@@ -195,7 +291,8 @@ for(build in c('grch37','grch38')){
   cpg_pathogenic_tsv <- as.data.frame(
     cpg_pathogenic_tsv %>%
       dplyr::select(-pathogenic_loci_trait) %>%
-      dplyr::left_join(cpg_pathogenic_traits)
+      dplyr::left_join(cpg_pathogenic_traits) %>%
+      pcgrr::append_ucsc_segment_link(hgname = hgname, chrom = "chrom", start = "start", end = "end")
   )
   
   cpg_pathogenic_bed <- dplyr::bind_rows(dplyr::select(cpg_pathogenic_protein_regions,chrom,start, end,name), 
@@ -216,81 +313,105 @@ for(build in c('grch37','grch38')){
 
 for(build in c('grch37','grch38')){
   
-  civic_biomarkers <- read.table(file=paste0("data-raw/civic.",build,".biomarkers.tsv"),sep="\t",header=T,stringsAsFactors = F,quote="",na.strings=c("","NA"),comment.char="") %>%
-    dplyr::select(genesymbol, evidence_id, evidence_type, clinical_significance, variant_name, variant_origin, pubmed_html_link, cancer_type, disease_ontology_id, eitem_codon, eitem_exon, alteration_type, mapping_category, evidence_level, therapeutic_context) %>%
-    dplyr::filter(variant_origin == "Somatic Mutation") %>%
-    dplyr::filter(mapping_category == "exact" | mapping_category == "codon" | mapping_category == "exon") %>%
+  civic_biomarkers <- read.table(file=paste0("data-raw/civic.",build,".biomarkers.tsv"),sep="\t",header=T,
+                                 stringsAsFactors = F,quote="",na.strings=c("","NA"),comment.char="") %>%
+    dplyr::select(symbol, evidence_id, evidence_type, clinical_significance, variant_name, 
+                  variant_origin, citation, cancer_type, disease_ontology_id, eitem_codon, 
+                  eitem_exon, alteration_type, biomarker_mapping, evidence_level, therapeutic_context) %>%
+    dplyr::filter(variant_origin == "Somatic") %>%
+    dplyr::filter(biomarker_mapping == "exact" | biomarker_mapping == "codon" | biomarker_mapping == "exon") %>%
     dplyr::filter(evidence_type != "Predisposing") %>%
     dplyr::filter(!is.na(clinical_significance)) %>%
-    dplyr::rename(codon = eitem_codon, exon = eitem_exon, symbol = genesymbol) %>%
-    dplyr::select(evidence_id, symbol, variant_name, clinical_significance,pubmed_html_link,cancer_type,evidence_type, evidence_level,disease_ontology_id,codon,exon, therapeutic_context) 
+    dplyr::rename(codon = eitem_codon, exon = eitem_exon) %>%
+    dplyr::select(evidence_id, symbol, variant_name, 
+                  clinical_significance, citation,
+                  cancer_type,evidence_type, evidence_level, 
+                  disease_ontology_id,codon,exon, therapeutic_context) 
   
-  civic_regions <- read.table(file=paste0("data-raw/civic.",build,".bed"),skip=1,sep="\t",header=F,stringsAsFactors = F,quote="",na.strings=c("","NA"),comment.char="#")
-  colnames(civic_regions) <- c('chrom','start','end','evidence_id')
-  civic_regions <- dplyr::inner_join(civic_regions, civic_biomarkers)
-  civic_regions$name <- NA
-  civic_regions <- dplyr::mutate(civic_regions, variant_name_2 = stringr::str_replace(variant_name,"FS$|FS\\*[0-9]{1,}",""))
-  civic_regions[!is.na(civic_regions$exon),]$name <- paste0("civic:",civic_regions[!is.na(civic_regions$exon),]$evidence_id,":",civic_regions[!is.na(civic_regions$exon),]$symbol,":exon",civic_regions[!is.na(civic_regions$exon),]$exon)
-  civic_regions[!is.na(civic_regions$codon) & stringr::str_detect(civic_regions$variant_name_2,"[A-Z]{1}[0-9]{1,}"),]$name <- paste0("civic:",civic_regions[!is.na(civic_regions$codon) & stringr::str_detect(civic_regions$variant_name_2,"[A-Z]{1}[0-9]{1,}"),]$evidence_id, ":", civic_regions[!is.na(civic_regions$codon) & stringr::str_detect(civic_regions$variant_name_2,"[A-Z]{1}[0-9]{1,}"),]$symbol,":p.",civic_regions[!is.na(civic_regions$codon) & stringr::str_detect(civic_regions$variant_name_2,"[A-Z]{1}[0-9]{1,}"),]$variant_name_2)
+  civic_regions <- read.table(file=paste0("data-raw/civic.",build,".bed"),skip=1,sep="\t",header=F,
+                              stringsAsFactors = F,quote="",na.strings=c("","NA"),comment.char="#", 
+                              col.names = c('chrom','start','end','evidence_id')) %>%
+    dplyr::inner_join(civic_biomarkers) %>%
+    dplyr::mutate(name = NA) %>%
+    dplyr::mutate(variant_name_2 = stringr::str_replace(variant_name,"FS$|FS\\*[0-9]{1,}","")) %>%
+    dplyr::mutate(name = dplyr::if_else(!is.na(exon),
+                                        paste0("civic:",evidence_id,":exon",exon),
+                                        as.character(name))) %>%
+    dplyr::mutate(name = dplyr::if_else(!is.na(codon) & stringr::str_detect(variant_name_2,"[A-Z]{1}[0-9]{1,}"),
+                                        paste0("civic:",evidence_id,":",symbol,":p.",variant_name_2),
+                                        as.character(name)))
     
-  civic_variants <- read.table(file=gzfile(paste0("data-raw/civic.pcgr_acmg.",build,".pass.tsv.gz")),skip=1,sep="\t",header=T,stringsAsFactors = F,quote="",na.strings=c("","NA"),comment.char="") %>%
-    dplyr::select(Consequence,SYMBOL,HGVSp_short,CDS_CHANGE,CHROM,POS,REF,ALT,CIVIC_ID) %>%
+  civic_variants <- read.table(file=gzfile(paste0("data-raw/civic.pcgr_acmg.",build,".pass.tsv.gz")),
+                               skip=1,sep="\t",header=T,stringsAsFactors = F,quote="",na.strings=c("","NA"),comment.char="") %>%
+    dplyr::select(Consequence, SYMBOL, HGVSp_short, CDS_CHANGE, 
+                  CHROM, POS, REF, ALT, CIVIC_ID) %>%
     tidyr::separate_rows(CIVIC_ID) %>%
-    dplyr::rename(consequence = Consequence, evidence_id = CIVIC_ID, hgvsp = HGVSp_short,symbol = SYMBOL, chrom = CHROM, pos = POS, ref = REF, alt = ALT) %>%
+    dplyr::rename(consequence = Consequence, evidence_id = CIVIC_ID, 
+                  hgvsp = HGVSp_short,symbol = SYMBOL, chrom = CHROM, 
+                  pos = POS, ref = REF, alt = ALT) %>%
     dplyr::mutate(genomic_change = paste(chrom,pos,ref,alt,sep="_")) %>%
     dplyr::mutate(hgvsc = stringr::str_match(CDS_CHANGE,"c\\.[0-9]{1}.+:|c\\.[0-9]{1,}(\\+|-)[0-9]{1,}.+")[,1]) %>%
     dplyr::mutate(codon_pcgr = stringr::str_match(hgvsp,"[0-9]{1,}")[,1]) %>%
     dplyr::mutate(ensembl_transcript_id = stringr::str_match(CDS_CHANGE,"ENST[0-9]{1,}")[,1]) %>%
     dplyr::mutate(hgvsc = stringr::str_replace(hgvsc,":exon[0-9]{1,}:","")) %>%
-    dplyr::select(chrom, pos, ref, alt, symbol, genomic_change, hgvsp, hgvsc, codon_pcgr, ensembl_transcript_id, consequence, evidence_id) %>%
+    dplyr::select(chrom, pos, ref, alt, symbol, genomic_change, hgvsp, hgvsc, 
+                  codon_pcgr, ensembl_transcript_id, consequence, evidence_id) %>%
     dplyr::distinct()
   
-  refseq_gencode_trans <- read.table(gzfile(paste0("data-raw/pcgr_onco_xref.",build,".tsv.gz")),header=T,stringsAsFactors = F,quote="",sep="\t",na.strings=c("","NA"),comment.char="#") %>%
+  refseq_gencode_trans <- read.table(gzfile(paste0("data-raw/pcgr_onco_xref.",build,".tsv.gz")),header=T,
+                                     stringsAsFactors = F,quote="",sep="\t",na.strings=c("","NA"),comment.char="#") %>%
     dplyr::select(ensembl_transcript_id, refseq_mrna) %>%
     dplyr::filter(!is.na(refseq_mrna))
   
-  civic_variants <- dplyr::left_join(civic_variants, refseq_gencode_trans)
+  civic_variants <- civic_variants %>%
+    dplyr::left_join(refseq_gencode_trans) %>%
+    dplyr::inner_join(civic_biomarkers) %>%
+    dplyr::mutate(hgvsp = stringr::str_replace(hgvsp,"p\\.","")) %>%
+    dplyr::mutate(variant_name_2 = stringr::str_replace(variant_name,"\\*$","X")) %>%
+    dplyr::mutate(variant_name_2 = stringr::str_replace(variant_name_2,"DUP","dup")) %>%
+    dplyr::mutate(variant_name_2 = stringr::str_replace(variant_name_2,"FS","fs")) %>%
+    dplyr::mutate(codon = dplyr::if_else(is.na(codon) & !is.na(codon_pcgr),
+                                         codon_pcgr,
+                                         as.character(codon))) %>%
+    dplyr::mutate(codon = as.integer(codon))
+    
  
-  civic_variants <- dplyr::inner_join(civic_variants, civic_biomarkers)
-  
-  civic_variants$hgvsp <- stringr::str_replace(civic_variants$hgvsp,"p\\.","")
-  civic_variants <- dplyr::mutate(civic_variants, variant_name_2 = stringr::str_replace(variant_name,"\\*$","X"))
-  civic_variants <- dplyr::mutate(civic_variants, variant_name_2 = stringr::str_replace(variant_name_2,"DUP","dup"))
-  civic_variants <- dplyr::mutate(civic_variants, variant_name_2 = stringr::str_replace(variant_name_2,"FS","fs"))
-  if(nrow(civic_variants[is.na(civic_variants$codon) & !is.na(civic_variants$codon_pcgr),]) > 0){
-    civic_variants[is.na(civic_variants$codon) & !is.na(civic_variants$codon_pcgr),]$codon <- civic_variants[is.na(civic_variants$codon) & !is.na(civic_variants$codon_pcgr),]$codon_pcgr
-  }
-  civic_variants$codon <- as.integer(civic_variants$codon)
-  
-  matching_isoform <- civic_variants[stringr::str_detect(string = civic_variants$variant_name_2, pattern = civic_variants$hgvsp),] %>% dplyr::select(evidence_id,variant_name)
+  matching_isoform <- civic_variants[stringr::str_detect(string = civic_variants$variant_name_2, pattern = civic_variants$hgvsp),]  %>% 
+    dplyr::select(evidence_id,variant_name)
   civic_variants_matching <- dplyr::semi_join(civic_variants,matching_isoform)
   non_matching_isoform <- civic_variants[!stringr::str_detect(string = civic_variants$variant_name_2, pattern = civic_variants$hgvsp),]
   non_matching_isoform <- dplyr::anti_join(non_matching_isoform,matching_isoform)
-  civic_variants <- dplyr::bind_rows(civic_variants_matching, non_matching_isoform)
-  civic_variants$name <- paste0("civic:",civic_variants$evidence_id, ":",civic_variants$symbol,":p.",stringr::str_replace(civic_variants$hgvsp,"[A-Z]$|dup$|delins[A-Z]{1,}$|fs$|ins[A-Z]{1,}$",""))
-  civic_variants[civic_variants$hgvsp == '.' & !is.na(civic_variants$hgvsc),]$name <- paste0("civic:",civic_variants[civic_variants$hgvsp == '.' & !is.na(civic_variants$hgvsc),]$evidence_id,":",civic_variants[civic_variants$hgvsp == '.' & !is.na(civic_variants$hgvsc),]$symbol,":",civic_variants[civic_variants$hgvsp == '.' & !is.na(civic_variants$hgvsc),]$hgvsc)
-  
   civic_variants <- as.data.frame(
-    civic_variants %>%
-    dplyr::group_by(symbol, chrom, hgvsp, consequence, evidence_id, variant_name, clinical_significance, pubmed_html_link, cancer_type, evidence_type, evidence_level,
-                                     disease_ontology_id, codon, exon, therapeutic_context, variant_name_2, name) %>%
-    dplyr::summarise(hgvsc = paste(unique(hgvsc),collapse=", "), genomic_change = paste(unique(genomic_change),collapse=", "), 
+    dplyr::bind_rows(civic_variants_matching, non_matching_isoform) %>%
+    dplyr::mutate(name = paste0("civic:",evidence_id, ":",symbol,":p.",stringr::str_replace(hgvsp,"[A-Z]$|dup$|delins[A-Z]{1,}$|fs$|ins[A-Z]{1,}$",""))) %>%
+    dplyr::mutate(name = dplyr::if_else(hgvsp == '.' & !is.na(hgvsc),
+                                        paste0("civic:",evidence_id,":",symbol,":",hgvsc),
+                                        as.character(name))) %>%
+    dplyr::group_by(symbol, chrom, hgvsp, consequence, evidence_id, 
+                    variant_name, clinical_significance, citation, 
+                    cancer_type, evidence_type, evidence_level,
+                    disease_ontology_id, codon, exon, therapeutic_context, variant_name_2, name) %>%
+    dplyr::summarise(hgvsc = paste(unique(hgvsc),collapse=", "), 
+                     genomic_change = paste(unique(genomic_change),collapse=", "), 
                      ensembl_transcript_id = paste(unique(ensembl_transcript_id), collapse=", "), 
                      refseq_mrna = paste(unique(refseq_mrna), collapse=", "),
                      start = min(pos) - 6, 
                      end = min(pos) + max(nchar(ref),nchar(alt)) + 4) %>%
-      dplyr::arrange(chrom,start,end)
+    dplyr::arrange(chrom,start,end) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(name = dplyr::if_else(symbol == 'TERT' & consequence == 'upstream_gene_variant',
+                                        'TERT:upstream_gene_variant_C228T',
+                                        as.character(name))) %>%
+    dplyr::mutate(name = dplyr::if_else(symbol == 'CDKN2A' & consequence == 'upstream_gene_variant',
+                                          'CDKN2A:upstream_gene_variant_CA12951936',
+                                          as.character(name)))
   )
   
-  if(nrow(civic_variants[civic_variants$symbol == 'TERT' & civic_variants$consequence == 'upstream_gene_variant',]) > 0){
-    civic_variants[civic_variants$symbol == 'TERT' & civic_variants$consequence == 'upstream_gene_variant',]$name <- "TERT:upstream_gene_variant_C228T"
-  }
-  if(nrow(civic_variants[civic_variants$symbol == 'CDKN2A' & civic_variants$consequence == 'upstream_gene_variant',]) > 0){
-    civic_variants[civic_variants$symbol == 'CDKN2A' & civic_variants$consequence == 'upstream_gene_variant',]$name <- "CDKN2A:upstream_gene_variant_CA12951936"
-  }
-  
-  civic_all <- dplyr::bind_rows(civic_variants,civic_regions) %>% dplyr::arrange(chrom,start,end) %>% dplyr::distinct()
-  civic_all_bed <- dplyr::select(civic_all,chrom,start,end,name) %>% dplyr::arrange(chrom,start,end)
+  civic_all <- dplyr::bind_rows(civic_variants,civic_regions) %>% 
+    dplyr::arrange(chrom,start,end) %>% 
+    dplyr::distinct()
+  civic_all_bed <- dplyr::select(civic_all,chrom,start,end,name) %>% 
+    dplyr::arrange(chrom,start,end)
   
   cancer_somatic_actionable_loci_tsv <- civic_all
   
@@ -305,7 +426,8 @@ for(build in c('grch37','grch38')){
 
 for(build in c('grch37','grch38')){
   
-    hotspot_variants <- read.table(file=paste0("data-raw/cancer_hotspots.",build,".tsv"),skip=1,sep="\t",header=T,stringsAsFactors = F,quote="",na.strings=c("","NA"),comment.char="") %>%
+    hotspot_variants <- read.table(file=paste0("data-raw/cancer_hotspots.",build,".tsv"),skip=1,sep="\t",header=T,
+                                   stringsAsFactors = F,quote="",na.strings=c("","NA"),comment.char="") %>%
       dplyr::select(MUTATION_HOTSPOT,MUTATION_HOTSPOT_CANCERTYPE,MUTATION_HOTSPOT_TRANSCRIPT,CHROM,POS,REF,ALT) %>%
       tidyr::separate_rows(MUTATION_HOTSPOT_CANCERTYPE,sep=",") %>%
       dplyr::rename(hotspot = MUTATION_HOTSPOT, hotspot_cancer_type = MUTATION_HOTSPOT_CANCERTYPE, chrom = CHROM, pos = POS, ref = REF, alt = ALT) %>%
@@ -369,7 +491,9 @@ for(build in c('grch37','grch38')){
 }
 
 for(build in c('grch37','grch38')){
-  global_bed <- sort_bed_regions(rbind(all_tracks[['bed']][[build]][['clinvar_path']], all_tracks[['bed']][[build]][['civic']], all_tracks[['bed']][[build]][['hotspot']]))
+  global_bed <- sort_bed_regions(rbind(all_tracks[['bed']][[build]][['clinvar_path']], 
+                                       all_tracks[['bed']][[build]][['civic']], 
+                                       all_tracks[['bed']][[build]][['hotspot']]))
   write.table(global_bed,file=paste0("data/cacao.",datestamp,".",build,".bed"),sep="\t",row.names=F,quote=F,col.names=F)
   global_bed$chrom <- paste0('chr',global_bed$chrom)
   write.table(global_bed,file=paste0("data/cacao.",datestamp,".",build,".chr.bed"),sep="\t",row.names=F,quote=F,col.names=F)

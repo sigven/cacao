@@ -1,4 +1,4 @@
-FROM ubuntu:xenial
+FROM ubuntu:18.04
 
 RUN apt-get update \
   && apt-get install -y python3-pip python3-dev \
@@ -7,21 +7,24 @@ RUN apt-get update \
   && pip3 install --upgrade pip
 
 RUN apt-get update && apt-get -y install apache2 apt-utils build-essential curl git unzip vim wget sudo libudunits2-dev libgeos-dev libgdal-dev
-# install ensembl dependencies
-#RUN cpanm Test::Object PPI::Document Task::Weaken Test::SubCalls Test::Object DBI DBD::mysql Archive::Zip Perl::Critic Set::IntervalTree
-
 RUN apt-get update && apt-get install apt-transport-https
 
 
 RUN sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
 RUN sudo apt-get update \
    && sudo apt-get -y install software-properties-common
-RUN sudo add-apt-repository 'deb [arch=amd64,i386] https://cran.rstudio.com/bin/linux/ubuntu xenial/'
+
+ENV TZ=Europe/Minsk
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN sudo add-apt-repository 'deb [arch=amd64,i386] https://cloud.r-project.org/bin/linux/ubuntu bionic-cran35/'
+RUN apt-get update && apt-get -y install r-base
+
 
 USER root
 WORKDIR /
 
-ENV PACKAGE_BIO="libhts1 bedtools"
+ENV PACKAGE_BIO="libhts2 bedtools"
 ENV PACKAGE_DEV="gfortran gcc-multilib autoconf libmariadb-client-lgpl-dev liblzma-dev libncurses5-dev libblas-dev liblapack-dev libssh2-1-dev libxml2-dev vim libssl-dev libcairo2-dev libbz2-dev libcurl4-openssl-dev"
 ENV PYTHON_MODULES="numpy cython scipy pandas cyvcf2 toml"
 RUN apt-get update \
@@ -65,7 +68,7 @@ ENV PATH=/usr/local/bin/bin:$PATH
 
 WORKDIR /
 ENV HOME=/usr/local
-RUN curl -O https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+RUN wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
 RUN bash Miniconda3-latest-Linux-x86_64.sh -b
 ENV PATH=$PATH:/usr/local/miniconda3/bin:
 RUN conda config --add channels bioconda

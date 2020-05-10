@@ -8,7 +8,7 @@ import subprocess
 import logging
 import sys
 
-cacao_version = '0.2.1'
+cacao_version = '0.3.0'
 
 
 def __main__():

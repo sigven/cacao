@@ -117,8 +117,8 @@ The coverage report is generated with _[cacao](https://github.com/sigven/cacao)_
 * Genome assembly: __`r cacao_report[['genome_assembly']]`__
 * Mode: __`r mode`__
 * Data sources - cancer loci:
-    * [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) - release 20181101
-    * [CIViC](http://civic.genome.wustl.edu) - Nov 18th 2018
+    * [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) - release 20200503
+    * [CIViC](http://civic.genome.wustl.edu) - May 4th 2020
     * [cancerhotspots.org](http://cancerhotspots.org) - version 2 (2017)
 * Alignment quality threshold (MAPQ): __`r cacao_report[['mapq']]`__
 * Alignment filename: __`r cacao_report[['host_alignment_fname']]`__
