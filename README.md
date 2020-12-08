@@ -1,16 +1,36 @@
-# *CA*llable *CA*ncer L*O*ci (CACAO)
+## cacao -  *ca*llable *ca*ncer l*o*ci
 
-The *CACAO* framework provides software and data to assess *sequencing depth for clinically actionable/pathogenic loci in cancer* for a given sequence alignment (BAM/CRAM). Most importantly, the software will pinpoint genomic loci of clinical relevance in cancer that has sufficient **sequencing coverage** for reliable variant calling. In combination with the actual variants that have been identified, it may thus serve to confirm **negative findings**, a matter of significant clinical value that is underappreciated in current cancer sequencing analysis. The specific requirements to denote loci as *callable* (i.e. depth & alignment quality) can be configured by the user, and should thus reflect how the input are used for variant calling (RNA/DNA, germline/somatic calling)
+### Contents
 
-Technically, *CACAO* combines the speed of [mosdepth](https://github.com/brentp/mosdepth) with the powerful [R markdown framework](https://rmarkdown.rstudio.com/) for interactive data reporting. It employs the [Docker](https://www.docker.com) technology for software encapsulation to ease the installation process.
+- [Overview](#overview)
+- [News](#news)
+- [Annotation resources](#annotation-resources)
+- [Example reports](#example-reports)
+- [Getting started](#getting-started)
+- [Contact](#contact)
+
+### Overview
+
+**cacao** is a computational workflow that provides software and data to assess *sequencing depth for clinically actionable/pathogenic loci in cancer* for a given sequence alignment (BAM/CRAM). Most importantly, the software will pinpoint genomic loci of clinical relevance in cancer that has sufficient **sequencing coverage** for reliable variant calling. In combination with the actual variants that have been identified, it may thus serve to confirm **negative findings**, a matter of significant clinical value that is underappreciated in current cancer sequencing analysis. The specific requirements to denote loci as *callable* (i.e. depth & alignment quality) can be configured by the user, and should thus reflect how the input are used for variant calling (RNA/DNA, germline/somatic calling)
+
+Technically, **cacao** combines the speed of [mosdepth](https://github.com/brentp/mosdepth) with the powerful [R markdown framework](https://rmarkdown.rstudio.com/) for interactive data reporting. It currently employs the [Docker](https://www.docker.com) technology for software encapsulation to ease the installation process (A Conda package is in the making)
+
+### News
+
+* December 9th 2020: **0.3.1 release**
+	* Updated track directory for ClinVar and CIViC
+	* Dockerfile uses [renv](https://rstudio.github.io/renv/articles/renv.html) for improved installation of R package dependencies
+
+### Annotation resources (v0.3.1)
 
 Three clinical genomic tracks in BED format have been created:
 
 * Loci with pathogenic and likely pathogenic variants in protein-coding genes related to cancer predisposition and inherited cancer syndromes (BRCA1, BRCA2, ATM etc.)
-	* Variants have been retrieved from [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar) (May 7th 2020 release)
+	* Variants have been retrieved from [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar) (December 2020 release)
+	* The collection of cancer predisposition genes comes from the [superpanel (panel 0)](https://github.com/sigven/cpsr#cancer-predisposition-genes) established in the [Cancer Predisposition Sequencing Reporter (CPSR)](https://github.com/sigven/cpsr)
 * Loci associated with actionable somatic variants (related to prognosis, diagnosis, or drug sensitivity, e.g. BRAF V600E)
-	* Variants have been retrieved from [CIViC](https://civicdb.org) (data obtained May 4th 2020)
-	* Only variants that we are able to map unambigusously to the genome are included
+	* Variants have been retrieved from [CIViC](https://civicdb.org) (data harvested December 9th 2020)
+	* Only variants that can be mapped unambigusously to the genome are considered as sources of actionable loci
 * Loci identified as somatic mutational hotspots (i.e. likely driver alterations) in cancer
 	* Variants have been retrieved from [cancerhotspots.org](https://www.cancerhotspots.org) (v2)
 
@@ -21,42 +41,50 @@ All three tracks (*hereditary*, *somatic_actionable*, and *somatic_hotspot*) are
    * clinical evidence items (therapeutic context, evidence level, from CIViC)
    * tumor types (cancerhotspots.org)
 
-## Example reports
- - An [example report](https://folk.uio.no/sigven/test.cacao.grch37.html) from the CACAO workflow showing callable cancer loci in an RNA sequence alignment.
- - A [targeted, example report](https://folk.uio.no/sigven/test_targeted.cacao.grch37.html) showing callable cancer loci in BRCA genes only
-	 - This is generated through the `--query_target` option
+### Example reports
+ - An [example report](http://insilico.hpc.uio.no/pcgr/test_grch37_coverage_cacao.html) from the CACAO workflow showing callable cancer loci in an RNA sequence alignment.
 
-## Getting started
+### Getting started
 
-### Installation
+#### Installation
 
 * Prerequisites:
 	* Make sure that [Docker](https://www.docker.com/) is installed and running
 	* The CACAO workflow script `cacao_wflow.py` requires that Python3 is installed
-* Clone the repository `git clone https://github.com/sigven/cacao.git`
-* Pull the docker image `docker pull sigven/cacao:0.3.0`
+* Download the [latest release](https://github.com/sigven/cacao/releases/latest)
+* Pull the latest docker image `docker pull sigven/cacao:0.3.1`
 
-### Usage
+#### Usage
 
-Run the CACAO workflow with the `cacao_wflow.py` Python script, which takes the following parameters and options:
+Run the CACAO workflow with the `cacao_wflow.py` Python script, which takes the following required and optional arguments:
 
-	usage: cacao_wflow.py [options] <BAM-or-CRAM> <TRACK_DIRECTORY> <OUTPUT_DIR> <GENOME_ASSEMBLY> <CANCER_MODE> <SAMPLE_ID>
+	usage:
+	cacao_wflow.py -h [options]
+	--query_aln BAM/CRAM
+	--track_dir TRACK_DIR
+	--output_dir OUTPUT_DIR
+	--genome_assembly grch37|grch38
+	--sample_id SAMPLE_ID
+	--mode hereditary|somatic|any
 
 	cacao - assessment of sequencing coverage at pathogenic and actionable loci in
 	cancer
 
-	positional arguments:
-	  query_alignment       Alignment file (BAM/CRAM)
-	  track_directory       Directory with BED tracks of pathogenic/actionable
-	                        cancer loci for grch37/grch38
-	  output_directory      Output directory
-	  {grch37,grch38}       Human genome assembly build: grch37 or grch38
-	  {hereditary,somatic,any}
-	                        Choice of loci and clinical cancer context (cancer
-	                        predisposition/tumor sequencing)
-	  sample_id             Sample identifier - prefix for output files
+	Required arguments:
+	  --query_aln QUERY_ALN
+	                        Query alignment file (BAM/CRAM)
+	  --track_dir TRACK_DIR
+	                        Directory with BED tracks of pathogenic/actionable cancer loci for grch37/grch38
+	  --output_dir OUTPUT_DIR
+	                        Output directory
+	  --genome_assembly {grch37,grch38}
+	                        Human genome assembly build: grch37 or grch38
+	  --mode {hereditary,somatic,any}
+	                        Choice of loci and clinical cancer context (cancer predisposition/tumor sequencing)
+	  --sample_id SAMPLE_ID
+	                        Sample identifier - prefix for output files
 
-	optional arguments:
+	Optional arguments:
 	  -h, --help            show this help message and exit
 	  --mapq MAPQ           mapping quality threshold (default: 0)
 	  --threads THREADS     Number of mosdepth BAM decompression threads. (use 4
@@ -79,10 +107,11 @@ Run the CACAO workflow with the `cacao_wflow.py` Python script, which takes the 
 	                        overwrite of existing result files by using this flag
 	                        (default: False)
 	  --version             show program's version number and exit
-## Documentation
 
-IN THE MAKING
+### Documentation
 
-## Contact
+Coming
+
+### Contact
 
 sigven AT ifi.uio.no

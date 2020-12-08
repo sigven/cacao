@@ -1,10 +1,15 @@
 Package: cacao
 Type: Package
 Title: Callable Cancer Loci
-Version: 0.3.0
+Version: 0.3.1
 Author: Sigve Nakken
 Maintainer: Sigve Nakken <sigven@ifi.uio.no>
-Description: Variant coverage (callability) report for actionable and pathogenic loci in cancer
+Description: Package for assessment of variant callability in a given sequence alignment 
+  with respect to i) loci of known somatic mutation hotspots in cancer , ii) loci for somatic 
+  biomarkers in cancer, and iii) loci for pathogenic variants in hereditary cancers. Different levels 
+  of callability (no coverage / low coverage / callable / high coverage), is determined 
+  based on sequencing depth at the relevant loci in the given alignment, and where thresholds
+  between levels can be configured by the user.
 License: MIT
 Encoding: UTF-8
 LazyData: true

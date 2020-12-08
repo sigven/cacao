@@ -13,6 +13,12 @@ output:
 
 ---
 
+<style>
+ol ul {
+    margin-bottom: 2px;
+}
+</style>
+
 ```{r global_options, include=FALSE}
 knitr::opts_chunk$set(echo = F,warning=FALSE, dpi=72, error=F, eval=T)
 
@@ -117,8 +123,8 @@ The coverage report is generated with _[cacao](https://github.com/sigven/cacao)_
 * Genome assembly: __`r cacao_report[['genome_assembly']]`__
 * Mode: __`r mode`__
 * Data sources - cancer loci:
-    * [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) - release 20200503
-    * [CIViC](http://civic.genome.wustl.edu) - May 4th 2020
+    * [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) - release 20201128
+    * [CIViC](http://civic.genome.wustl.edu) - December 9th 2020
     * [cancerhotspots.org](http://cancerhotspots.org) - version 2 (2017)
 * Alignment quality threshold (MAPQ): __`r cacao_report[['mapq']]`__
 * Alignment filename: __`r cacao_report[['host_alignment_fname']]`__
@@ -127,10 +133,10 @@ The coverage report is generated with _[cacao](https://github.com/sigven/cacao)_
 ```{r levels_somatic, results="asis", echo = F, eval = eval_section[['somatic_actionable']]}
 cat("* Callability levels (<b>somatic</b>):\n")
 cat("<ul>\n")
-cat(paste0("<li><i>NO_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['no_coverage']],"</li>\n"))
-cat(paste0("<li><i>LOW_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['low']],"</li>\n"))
-cat(paste0("<li><i>CALLABLE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['callable']],"</li>\n"))
-cat(paste0("<li><i>HIGH_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['high']],"</li>\n"))
+cat(paste0("<li><i>NO_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['no_coverage']],"</li>"))
+cat(paste0("<li><i>LOW_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['low']],"</li>"))
+cat(paste0("<li><i>CALLABLE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['callable']],"</li>"))
+cat(paste0("<li><i>HIGH_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['somatic']][['high']],"</li>"))
 cat("</ul>\n")
 
 ```
@@ -138,10 +144,10 @@ cat("</ul>\n")
 ```{r levels_germline, results="asis", echo = F, eval = eval_section[['hereditary']]}
 cat("* Callability levels (<b>germline</b>):\n")
 cat("<ul>\n")
-cat(paste0("<li><i>NO_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['no_coverage']],"</li>\n"))
-cat(paste0("<li><i>LOW_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['low']],"</li>\n"))
-cat(paste0("<li><i>CALLABLE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['callable']],"</li>\n"))
-cat(paste0("<li><i>HIGH_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['high']],"</li>\n"))
+cat(paste0("<li><i>NO_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['no_coverage']],"</li>"))
+cat(paste0("<li><i>LOW_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['low']],"</li>"))
+cat(paste0("<li><i>CALLABLE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['callable']],"</li>"))
+cat(paste0("<li><i>HIGH_COVERAGE</i>: ",cacao_report[['callability']][['verbose']][['germline']][['high']],"</li>"))
 cat("</ul>\n")
 
 ```
@@ -162,7 +168,7 @@ htmltools::br()
 ```
 
 
-```{r gene_header, echo = F, fig.width=12, fig.height=2, eval=eval_section[['hereditary']]}
+```{r gene_header, echo = F, results = "asis", eval=eval_section[['hereditary']]}
 
 cat('### Gene distribution')
 

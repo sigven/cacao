@@ -6,12 +6,21 @@
 #' @param version cacao version
 #' @param genome_assembly human genome assembly (grch37/grch38)
 #' @param mapq_threshold alignment quality (MAPQ) filter
-#' @param callability_levels_germline array of three integers denoting thresholds for LOW_COVERAGE, CALLABLE, and HIGH_COVERAGE (germline setting)
-#' @param callability_levels_somatic array of three integers denoting thresholds for LOW_COVERAGE, CALLABLE, and HIGH_COVERAGE (somatic setting)
+#' @param callability_levels_germline array of three integers denoting
+#' thresholds for LOW_COVERAGE, CALLABLE, and HIGH_COVERAGE (germline setting)
+#' @param callability_levels_somatic array of three integers denoting thresholds
+#' for LOW_COVERAGE, CALLABLE, and HIGH_COVERAGE (somatic setting)
 #'
 #' @return coverage_df
 #'
-init_report <- function(mode, fname_aln, fname_target, sample_name, version, genome_assembly, mapq_threshold, callability_levels_germline, callability_levels_somatic){
+init_report <- function(mode, fname_aln,
+                        fname_target,
+                        sample_name,
+                        version,
+                        genome_assembly,
+                        mapq_threshold,
+                        callability_levels_germline,
+                        callability_levels_somatic){
 
   cacao_report <- list()
   cacao_report[['sample_name']] <- sample_name
@@ -28,23 +37,34 @@ init_report <- function(mode, fname_aln, fname_target, sample_name, version, gen
   cacao_report[['callability']] <- list()
   cacao_report[['callability']][['levels']] <- list()
   cacao_report[['callability']][['verbose']] <- list()
-  cacao_report[['callability']][['levels']][['germline']] <- callability_levels_germline
-  cacao_report[['callability']][['levels']][['somatic']] <- callability_levels_somatic
+  cacao_report[['callability']][['levels']][['germline']] <-
+    callability_levels_germline
+  cacao_report[['callability']][['levels']][['somatic']] <-
+    callability_levels_somatic
 
   for(c in c('somatic','germline')){
     cacao_report[['callability']][['verbose']][[c]] <- list()
     for(level in c('no_coverage','low','callable','high')){
       if(level == 'no_coverage'){
-        cacao_report[['callability']][['verbose']][[c]][['no_coverage']] <- 'No coverage (zero sequencing depth)'
+        cacao_report[['callability']][['verbose']][[c]][['no_coverage']] <-
+          'No coverage (zero sequencing depth)'
       }
       if(level == 'low'){
-        cacao_report[['callability']][['verbose']][[c]][['low']] <- paste0('Sequencing depth from 1 to ',cacao_report[['callability']][['levels']][[c]][2] - 1)
+        cacao_report[['callability']][['verbose']][[c]][['low']] <-
+          paste0('Sequencing depth from 1 to ',
+                 cacao_report[['callability']][['levels']][[c]][2] - 1)
       }
       if(level == 'callable'){
-        cacao_report[['callability']][['verbose']][[c]][['callable']] <- paste0('Sequencing depth from ',cacao_report[['callability']][['levels']][[c]][2],' to ',cacao_report[['callability']][['levels']][[c]][3] - 1)
+        cacao_report[['callability']][['verbose']][[c]][['callable']] <-
+          paste0('Sequencing depth from ',
+                 cacao_report[['callability']][['levels']][[c]][2],
+                 ' to ',
+                 cacao_report[['callability']][['levels']][[c]][3] - 1)
       }
       if(level == 'high'){
-        cacao_report[['callability']][['verbose']][[c]][['high']] <- paste0('Sequencing depth above ',cacao_report[['callability']][['levels']][[c]][3])
+        cacao_report[['callability']][['verbose']][[c]][['high']] <-
+          paste0('Sequencing depth above ',
+                 cacao_report[['callability']][['levels']][[c]][3])
       }
     }
   }
@@ -76,8 +96,10 @@ init_report <- function(mode, fname_aln, fname_target, sample_name, version, gen
 }
 
 #' Function that assigns a categorical callability level to a numeric coverage estimate
-#' @param coverage_df data frame with mosdepth-annotated loci (coverage at pathogenic/actionable cancer loci)
-#' @param coverage_levels array of three integers denoting thresholds for LOW_COVERAGE, CALLABLE, and HIGH_COVERAGE
+#' @param coverage_df data frame with mosdepth-annotated loci
+#' (coverage at pathogenic/actionable cancer loci)
+#' @param coverage_levels array of three integers denoting
+#' thresholds for LOW_COVERAGE, CALLABLE, and HIGH_COVERAGE
 #'
 #' @return coverage_df
 #'
@@ -87,11 +109,30 @@ assign_callability <- function(coverage_df, coverage_levels){
 
   if("COVERAGE" %in% colnames(coverage_df)){
     coverage_df <- coverage_df %>%
-      dplyr::mutate(CALLABILITY = dplyr::if_else(TARGET == F,"NON_TARGET",as.character(CALLABILITY))) %>%
-      dplyr::mutate(CALLABILITY = dplyr::if_else(COVERAGE == 0 & TARGET == T,"NO_COVERAGE",as.character(CALLABILITY))) %>%
-      dplyr::mutate(CALLABILITY = dplyr::if_else(COVERAGE > 0 & TARGET == T & COVERAGE < coverage_levels[2],"LOW_COVERAGE",as.character(CALLABILITY))) %>%
-      dplyr::mutate(CALLABILITY = dplyr::if_else(TARGET == T & COVERAGE >= coverage_levels[2] & COVERAGE < coverage_levels[3],"CALLABLE",as.character(CALLABILITY))) %>%
-      dplyr::mutate(CALLABILITY = dplyr::if_else(TARGET == T & COVERAGE >= coverage_levels[3],"HIGH_COVERAGE",as.character(CALLABILITY)))
+      dplyr::mutate(
+        CALLABILITY = dplyr::if_else(
+          TARGET == F,
+          "NON_TARGET",
+          as.character(CALLABILITY))) %>%
+      dplyr::mutate(
+        CALLABILITY = dplyr::if_else(
+          COVERAGE == 0 & TARGET == T,
+          "NO_COVERAGE",
+          as.character(CALLABILITY))) %>%
+      dplyr::mutate(
+        CALLABILITY = dplyr::if_else(
+          COVERAGE > 0 & TARGET == T & COVERAGE < coverage_levels[2],
+          "LOW_COVERAGE",
+          as.character(CALLABILITY))) %>%
+      dplyr::mutate(
+        CALLABILITY = dplyr::if_else(
+          TARGET == T & COVERAGE >= coverage_levels[2] & COVERAGE < coverage_levels[3],
+          "CALLABLE",
+          as.character(CALLABILITY))) %>%
+      dplyr::mutate(
+        CALLABILITY = dplyr::if_else(TARGET == T & COVERAGE >= coverage_levels[3],
+                                     "HIGH_COVERAGE",
+                                     as.character(CALLABILITY)))
   }
   return(coverage_df)
 
@@ -103,38 +144,55 @@ assign_callability <- function(coverage_df, coverage_levels){
 #' @return coverage_pr_loci
 #'
 read_raw_coverage <- function(bed_coverage_fname){
-  coverage_all_loci <- read.table(file=bed_coverage_fname,header=F,quote="",comment.char="",sep="\t",stringsAsFactors = F)
+  coverage_all_loci <-
+    read.table(file = bed_coverage_fname,
+               header = F, quote = "", comment.char = "",
+               sep = "\t", stringsAsFactors = F)
   if(ncol(coverage_all_loci) == 5){
-    colnames(coverage_all_loci) <- c('CHROM','START','END','NAME','COVERAGE')
+    colnames(coverage_all_loci) <-
+      c('CHROM','START','END','NAME','COVERAGE')
     coverage_all_loci$TARGET <- TRUE
   }
   else if(ncol(coverage_all_loci) == 6){
-    colnames(coverage_all_loci) <- c('CHROM','START','END','NAME','COVERAGE','TARGET_OVERLAP')
+    colnames(coverage_all_loci) <-
+      c('CHROM','START','END','NAME','COVERAGE','TARGET_OVERLAP')
     coverage_all_loci <- coverage_all_loci %>%
       dplyr::mutate(TARGET = dplyr::if_else(TARGET_OVERLAP == 0,FALSE,TRUE)) %>%
       dplyr::select(-TARGET_OVERLAP)
   }
 
   coverage_pr_loci <- list()
-  coverage_pr_loci[['all']] <- coverage_all_loci
-  coverage_pr_loci[['hereditary']] <- dplyr::filter(coverage_all_loci, stringr::str_detect(NAME,"^clinvar_path:"))
-  coverage_pr_loci[['somatic_actionable']] <- dplyr::filter(coverage_all_loci, stringr::str_detect(NAME,"^civic:"))
-  coverage_pr_loci[['somatic_hotspot']] <- dplyr::filter(coverage_all_loci, stringr::str_detect(NAME,"^hotspot:"))
+  coverage_pr_loci[['all']] <-
+    coverage_all_loci
+  coverage_pr_loci[['hereditary']] <- coverage_all_loci %>%
+    dplyr::filter(stringr::str_detect(NAME,"^clinvar_path:"))
+  coverage_pr_loci[['somatic_actionable']] <- coverage_all_loci %>%
+    dplyr::filter(stringr::str_detect(NAME,"^civic:"))
+  coverage_pr_loci[['somatic_hotspot']] <- coverage_all_loci %>%
+    dplyr::filter(stringr::str_detect(NAME,"^hotspot:"))
   return(coverage_pr_loci)
 }
 
 #' Function that appends variant/region annotations to coverage tracks
-#' @param coverage_df data frame with mosdepth-annotated loci (coverage at pathogenic/actionable cancernloci)
+#' @param coverage_df data frame with mosdepth-annotated
+#' loci (coverage at pathogenic/actionable cancernloci)
 #' @param annotation_df data frame with variant/region annotations
 #'
 #' @return coverage_df
 #'
-append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = "hereditary"){
+append_annotations <- function(coverage_df = NULL,
+                               annotation_df = NULL,
+                               mode = "hereditary"){
 
   if(mode == "hereditary" && !is.null(coverage_df) && !is.null(annotation_df)){
     annotation_df_status <- 'OK'
-    for(var in c('name','symbol','class','refseq_mrna','ensembl_transcript_id','hgvs_c', 'codon',
-                 'pathogenic_loci_trait', 'pathogenic_loci_trait_link','genomic_change')){
+    for(var in c('name','symbol','class',
+                 'refseq_mrna',
+                 'ensembl_transcript_id',
+                 'hgvs_c', 'codon',
+                 'pathogenic_loci_trait',
+                 'pathogenic_loci_trait_link',
+                 'genomic_change')){
       if(!(var %in% colnames(annotation_df))){
         annotation_df_status <- 'MISSING_DATA'
       }
@@ -183,12 +241,14 @@ append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = 
           dplyr::mutate(NAME = stringr::str_replace_all(NAME,"civic:EID[0-9]{1,}:","")) %>%
           dplyr::group_by(NAME, SYMBOL, REGION, ENSEMBL_TRANSCRIPT_ID, REFSEQ_TRANSCRIPT_ID, AMINO_ACID_POSITION, COVERAGE, TARGET, EVIDENCE_TYPE, EVIDENCE_LEVEL, CANCERTYPE) %>%
           dplyr::summarise(THERAPEUTIC_CONTEXT = paste(unique(THERAPEUTIC_CONTEXT), collapse=", "),
-                         CLINICAL_SIGNIFICANCE = paste(unique(CLINICAL_SIGNIFICANCE),collapse=", "),
+                         CLINICAL_SIGNIFICANCE = paste(unique(CLINICAL_SIGNIFICANCE), collapse=", "),
                          GENOMIC_CHANGE = paste(unique(GENOMIC_CHANGE),collapse=", "),
                          CITATION = paste(unique(CITATION), collapse=", ")))
 
 
-        therapeutic_contexts <- dplyr::select(coverage_df, NAME, REGION, TARGET, GENOMIC_CHANGE, CANCERTYPE, THERAPEUTIC_CONTEXT) %>%
+        therapeutic_contexts <- coverage_df %>%
+          dplyr::select(NAME, REGION, TARGET, GENOMIC_CHANGE,
+                        CANCERTYPE, THERAPEUTIC_CONTEXT) %>%
           tidyr::separate_rows(THERAPEUTIC_CONTEXT,sep=", ") %>%
           dplyr::distinct()
 
@@ -207,8 +267,11 @@ append_annotations <- function(coverage_df = NULL, annotation_df = NULL, mode = 
         dplyr::left_join(dplyr::select(annotation_df, name, symbol,
                                        hgvsp, cancer_type, pvalue, genomic_change),by=c("NAME" = "name")) %>%
         dplyr::rename(SYMBOL = symbol, P_VALUE = pvalue,
-                      CANCERTYPE = cancer_type, GENOMIC_CHANGE = genomic_change, HGVSp = hgvsp) %>%
-        dplyr::mutate(REGION = paste(paste(CHROM,START,sep=":"),END,sep="-"), COVERAGE = floor(COVERAGE)) %>%
+                      CANCERTYPE = cancer_type,
+                      GENOMIC_CHANGE = genomic_change,
+                      HGVSp = hgvsp) %>%
+        dplyr::mutate(REGION = paste(paste(CHROM,START,sep=":"),
+                                     END,sep="-"), COVERAGE = floor(COVERAGE)) %>%
         dplyr::mutate(NAME = stringr::str_replace_all(NAME,"hotspot:","")) %>%
         dplyr::select(-c(CHROM,START,END)) %>%
         dplyr::filter(!is.na(COVERAGE))
@@ -239,7 +302,10 @@ global_coverage_distribution <- function(coverage_pr_loci = NULL){
         dplyr::summarise(n = n()) %>%
         dplyr::mutate(PERCENT = round(as.numeric((n / n_total) * 100),1))
     )
-    coverage_dist$CALLABILITY <-  factor(coverage_dist$CALLABILITY, levels = c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE','CALLABLE','HIGH_COVERAGE'), ordered = T)
+    coverage_dist$CALLABILITY <-
+      factor(coverage_dist$CALLABILITY,
+             levels = c('NON_TARGET','NO_COVERAGE','LOW_COVERAGE',
+                        'CALLABLE','HIGH_COVERAGE'), ordered = T)
   }
   return(coverage_dist)
 }
